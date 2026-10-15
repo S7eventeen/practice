@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>点击打开网页</title>
+<!-- ── 这个文件只是**入口的路标**，本身不是网页 ──────────────────────
+     真正的主页在 proto\ref-hero.html。它必须留在 proto\ 里 —— 那一整套
+     页面靠**相对路径**互相找（ref-hero 挂同目录的 town.html，游戏厅那面
+     墙再去 ../assets/wall/ 取照片）。把它挪到最外层，这些路径会一起断。
+
+     所以最外层放这一个跳转页：双击它 → 立刻跳进 proto\ref-hero.html。
+     下面两条跳转**都留着**（meta refresh 和脚本），谁先生效都行，跳的是
+     同一个地方；脚本用 replace 是为了**不留下这一页在后退历史里** ——
+     否则用户按后退会回到这里、又被立刻弹回去，等于退不出去。
+
+     ★ 改了 proto\ 里主页的位置，这里也要跟着改。 -->
+<meta http-equiv="refresh" content="0; url=proto/ref-hero.html">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #14171a; color: #e8e6e1;
+    font: 16px/1.8 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+  }
+  .brand { font-size: 21px; font-weight: 700; letter-spacing: .22em; }
+  .tip { font-size: 14px; color: #7d858c; }
+  .tip a { color: #e8e6e1; }
+</style>
+</head>
+<body>
+  <div class="brand">S7EVENTEEN</div>
+  <div class="tip">正在打开……　没反应就<a href="proto/ref-hero.html">点这里</a></div>
+<script>location.replace("proto/ref-hero.html");</script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>联系方式 · 样张</title>
+<!--
+  联系方式板块。接的是 town.html 里 CG 链的第三格 —— 见 town.html 的 showCg()。
+
+  ══ 参考：BV1BTP5euE75 的 2:16 ═══════════════════════════════════════════
+  用户 2026-10-12：「你联系方式那个你做的太差了。你看看原片怎样，你怎么3D了」
+
+  上一版我做的是**等距 3D 地面**：地平线、灭点、近大远小的格子、两个点躺在地上。
+  原片**一丁点 3D 都没有** —— 没有地平线、没有透视、格子等大、线是直的。
+  我去把原站（wodniack.dev 的 .s-cta）整个量了一遍，全部实测值：
+
+    底        --color-primary  #f40c3f   （饱和色铺满一屏）
+    线/圆     --color-secondary #160000  （★ 线比底**暗**。上一版注释写反了）
+    网格      竖线 117.5px × 12 列，横线 96.5px —— 逐像素量的
+              = gapX 宽/12，gapY (视口高-128)/8。两张截图都对上，不是猜的
+              全屏只有**一条** <svg path>，每帧按 M…L… 重算，不是 div 表格
+    小圆      6rem 见方，正圆，里面 "GO"，字 ≈ 圆径 × .39
+    展开      大圆 = min(宽,高)-32，clip-path circle(0→50%) 1s cubic-bezier(1,0,0,1) 延迟 .2s
+              字号 = **直径 × .3743**（所以字大得离谱）
+    两行字    "Let's" 与 "Rock" **重叠在圆心**，上排 clip 只露上半、下排只露下半，
+              每字 4 层切片上下跳 ±52% + 闪烁 ⇒ 看着像**一个词在融化**
+              （视频里那个"伞状"就是两半错开的瞬间）
+    波动      一个 progress 半径从中心扫到边缘（15px/帧，波宽 30）
+              扫到的点沿径向被推一下，点自己带二阶弹簧回弹；每 3.35s 一发
+    鼓包      ★ 静态那个径向外推乘的是 wave.op，**初始是 0**
+              ⇒ 静止时网格是完美的矩形，鼠标移到圆上才鼓起来
+
+  ══ 本页对原片的改动（都有理由）═════════════════════════════════════════
+  1. 展开由 **hover 改成 hover 或点击** —— iframe 里和触屏上 hover 靠不住
+  2. **两个小圆**（微信 V / QQ Q）各开各的一盘 —— 原片只有一个「GO」。
+     两盘的两行字：微信 "VX" / "微信"，QQ "QQ" / "Q"（上排代号、下排落款，
+     原片是 "Let's" / "Rock"）
+  3. 号在两个地方各来一份：圆里一条**真链接**（点一下复制）、底部那条带上一个
+     **真 DOM 文本**（能选中、能 Ctrl+F、读屏读得出）—— 圆里那份是 DOM 图形，
+     选不中，所以两份都要，别省
+  4. 底部那条**没铺网格**的带（网格只画到 H-128）里放：左号 · 中 S7 标 · 右号
+
+  配色：用户给的撞色对 薄荷绿 #00F5A0 / 炭灰 #282D32，只用在这一页。
+    ?pal=mint （默认，**忠于原片**：饱和色铺底、圆是深色、字取底色）
+    ?pal=ash  （反过来：深灰铺底、薄荷绿只落在网格线和圆里的字上）
+-->
+<style>
+  /* ★ 别用 font 简写：`font:700 1rem/1 inherit` 里 inherit 只能当**整个** font 的值，
+     当 family 用会让整条声明被静默丢弃，字号退回 16px、而代码看着一字不错。
+     2026-10-12 在 contact-v2 上实测栽过一次（325px 的字变成 16px）。 */
+  :root{
+    --bg:#00F5A0; --gridline:#06231A; --discbg:#0A0D10; --discink:#00F5A0;
+    --ink:#06231A; --ink2:rgba(6,35,26,.72); --ink3:rgba(6,35,26,.5);
+    --line:rgba(6,16,12,.30); --hot:#0A0D10; --onhot:#00F5A0;
+    --ff:"Arial Black","Helvetica Neue",Impact,"Segoe UI",sans-serif;
+    --mono:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+    --ui:"Microsoft YaHei",system-ui,-apple-system,sans-serif;
+    /* 小圆直径。原片是 6rem（`.s__button`），用户嫌大要求收小 ⇒ 4.5rem。
+       `.go` 的字号按原片比例 3.75/6 = .625 跟着它算，改这一处两边一起动。 */
+    --dot:4.5rem;
+    /* 两个小圆的落点 —— **由 `setGrid()` 按网格交点算出来再写进来**，
+       这里只是 1440×900 下的值，用来兜住"脚本还没跑"的那一帧（否则会从左上角飞出来）。
+       第 5 / 第 7 列 × 第 4 行：x = 120×5 / 120×7，y = 96.5×4 + 31.5。 */
+    --pxL:600px; --pxR:840px; --py:417.5px;
+  }
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+            font-family:var(--ui);overflow:hidden;overscroll-behavior:none}
+
+  /* ── 网格：一条 path 铺满，z-index:1 ─────────────────────────────── */
+  #grid{position:fixed;top:-1px;left:-1px;z-index:1;
+        width:calc(100% + 2px);height:calc(100% + 2px);pointer-events:none}
+  #gp{fill:none;stroke:var(--gridline);stroke-width:1px}
+
+  /* ── 两个小圆（微信 V / QQ Q）。★ 大圆是**各自小圆的子元素**：mouseleave 只在
+        离开元素和它的所有后代时才触发，放到外面的话鼠标移到展开的大圆上会被判成
+        "离开"而收起 ──── */
+  /* ★ 这里的**零尺寸**和"不加 transform"都是有意的，拆任何一个都会静默出事：
+     · 零尺寸 + `.dot` 自己绝对定位 ⇒ 两个小圆能各自落在**网格线的交汇处**上
+       （原来 flex 居中只能把它们摆在"中线左右各 68px"，两个都不在交点上）。
+     · `#hovers` **绝不能加 transform**：`.disc` 是 `position:absolute`，它的包含块
+       就是最近的那个定位祖先 —— 有了 transform 它会改认 `#hovers`，
+       于是两盘的大圆又都跑回同一个圆心，而"点开哪个圆"照样能开，只是圆心错位
+       120px。到时候看着像"点左边那个、圆从中间冒出来"，却查不出哪儿写的。 */
+  #hovers{position:fixed;left:0;top:0;width:0;height:0;z-index:3}
+  /* 落点由 `setGrid()` 写的 `--pxL/--pxR/--py` 给（网格一改间距就得重算）。
+     ★ 居中用 `margin` 而不是 `transform:translate(-50%,-50%)` —— `.dot` 一旦有
+       transform 就**自己建了层叠上下文**，底下那句 `.go{z-index:3}` 便只在圆内
+       比较，再也盖不住另一个圆的大圆 ⇒ 另一个渠道又点不着了（就是下面那段注释
+       描述的同一个病，从另一头复发）。 */
+  .dot{position:absolute;top:var(--py);cursor:pointer;
+       width:var(--dot);height:var(--dot);
+       margin-left:calc(var(--dot) / -2);margin-top:calc(var(--dot) / -2)}
+  .dot[data-ch="wechat"]{left:var(--pxL)}
+  .dot[data-ch="qq"]{left:var(--pxR)}
+  /* ★ `position:relative;z-index:3` 是为了**命中区**，不是为了画：
+     大圆盘满屏（1440×900 下 x 286..1154、y -29..839），z-index 又比小圆高，
+     不把小圆抬上去的话鼠标**根本够不到另一个渠道** —— `_ct3.py` C2 段实测：
+     从 V 划到 Q，openCh 一直是 wechat。抬上来之后两块小圆的地仍然压在大圆上，
+     只是被 `.disc-open` 那两条规则画成了透明的（见下）。
+     ★ 字号 3.75rem 是**从原片抄的**（`.s__button{font:700 3.75rem/6.85rem}`），
+     先前写的 2.35rem 是"看着差不多"定的，不是量的。 */
+  .dot .go{position:relative;z-index:3;
+      width:100%;height:100%;background:var(--discbg);border-radius:999rem;color:var(--discink);
+      display:flex;align-items:center;justify-content:center;
+      /* .625 = 原片的 3.75rem / 6rem，跟着 `--dot` 一起缩 */
+      font-weight:700;font-size:calc(var(--dot) * .625);line-height:1;font-family:var(--ff);
+      letter-spacing:.05em;text-transform:uppercase;
+      transition:scale .6s cubic-bezier(.755,.05,.855,.06),background .2s linear}
+  .dot .goTx{display:block;transition:scale .6s cubic-bezier(.55,.055,.675,.19),opacity .2s linear}
+  .dot.on .go{scale:1.5}
+  .dot.on .goTx{scale:2}
+  /* ── 盘一开，两个小圆「让位」─────────────────────────────────────
+     原片就是这么收场的：`.s__button` z-index 1、`.s__cta` z-index 2，两者是兄弟，
+     所以大圆一开，小圆连同那个 GO 字**整个被盖住**（`.s__button__text` 那条
+     `scale:2` 根本看不见）。
+     我们照做，但只能**画成透明、留着那块地** —— 大圆铺满屏幕，把地也去掉的话
+     另一个渠道就永远点不着了（上面 `.go` 的 z-index 就是为这个抬的）。
+     ★ 别把这两条并回 `.dot.on`：要把**没开的那一盘**的小圆也一起隐掉，
+       否则 V / Q 两个字母会浮在圆里那个大字上。 */
+  body.disc-open .dot .go{background:transparent}
+  body.disc-open .dot .goTx{opacity:0}
+  /* ★ 另一盘正在收（.6s）时鼠标已经到了这一盘，两个大圆会在同一位置短暂重叠 ——
+     不管它：一次只点一个，收的那盘本来就快散尽了。 */
+
+  /* ── 展开的大圆（一盘一个）──────────────────────────────────────── */
+  /* ★ `absolute`（不是 `fixed`）+ 包含块落在 `.dot` 上 ⇒ **每一盘的大圆都以
+     自己那个小圆为圆心**。原片只有一个圆，本来就是从小圆位置绽开的；两盘化之后
+     这一条得显式保证，否则两个大圆会一起跑到屏幕正中 —— 那时点左边那个圆、
+     圆从中间冒出来，而 `?open=` 和探针读到的半径、字号全对，只有肉眼看得出。 */
+  .disc{--size:64rem;
+        position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;
+        width:var(--size);height:var(--size);
+        background:var(--discbg);border-radius:999rem;
+        clip-path:circle(0 at 50% 50%);overflow:hidden;color:var(--discink);
+        /* 字号 = 直径 × .3743。设在这一层是有意的：里面所有 .15em 之类都跟着它算 */
+        font-weight:700;font-size:calc(var(--size) * .3743);line-height:1;
+        font-family:var(--ff);text-align:center;text-transform:uppercase;
+        transition:clip-path .6s cubic-bezier(.86,0,.07,1);pointer-events:none;will-change:clip-path}
+  .dot.on .disc{clip-path:circle(50% at 50% 50%);
+        transition:clip-path 1s cubic-bezier(1,0,0,1) .2s;pointer-events:auto}
+  /* 展开瞬间那一圈：外环从 size*.5 收到 1rem，内环从 size*.5 收到 1px */
+  .disc::before,.disc::after{position:absolute;inset:0;z-index:4;border-radius:999rem;
+        content:"";pointer-events:none;transition:border-width .6s cubic-bezier(.86,0,.07,1)}
+  .disc::before{border:calc(var(--size) * .5) solid var(--discink)}
+  .disc::after {border:calc(var(--size) * .5) solid var(--discbg)}
+  .dot.on .disc::before{border-width:1rem;transition:border-width 1.1s cubic-bezier(1,0,0,1) .2s}
+  .dot.on .disc::after {border-width:1px; transition:border-width 1.005s cubic-bezier(1,0,0,1) .2s}
+
+  /* ── 圆心那两行字：重叠 + 各露一半 ⇒ 看着像一个词在融化 ──────────── */
+  /* ★ top 是 45%，跟小圆同一条水平线上 —— 不是 50%。原片 `.s__cta__line{top:45%}`，
+     写在 `.s-cta` 容器里（容器就是整屏），所以两行字的中心和大圆的几何中心差 5% 屏高。 */
+  .ln{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);
+      scale:.5;transition:scale 1.8s cubic-bezier(.23,1,.32,1) .6s;
+      white-space:nowrap;z-index:2;will-change:scale}
+  .dot.on .ln{scale:1}
+  .ln--top{clip-path:inset(-100% 0 calc(50% + .01em) 0)}   /* 只露上半 */
+  /* ★ 下排有 +.014em 的字距，上排没有 —— 原片就是这么写的（`.s__cta__line--bottom`）。
+     上排原来那 -.02em 是我自己加的，已删。 */
+  .ln--bot{clip-path:inset(calc(50% + .01em) 0 -100% 0);letter-spacing:.014em}  /* 只露下半 */
+  /* 高度 .8em、顶对齐 —— 照抄原片 `.s__cta__text{...align-items:flex-start;height:.8em}`。
+     盒子比行盒（1em）矮，字形**溢出到盒子下方**，这正是"上下各露一半"能对上的原因：
+     分界线取的是**盒子**的 50%（= .4em），字形只露到 .8em 处。
+     ★ 一整个 2 秒循环见 `_shots/_ct3_melt.png`：两行在整个窗口里来回穿，
+     极端帧上排或下排会**整个词**露出来（另一排滑出窗口）—— 这是对的，不是"少画了一行"。 */
+  .tx{display:flex;flex-direction:row;align-items:flex-start;justify-content:center;height:.8em}
+  .ch{position:relative;height:100%}
+  .ch:nth-child(1){--delay:.1s} .ch:nth-child(2){--delay:.2s}
+  .ch:nth-child(3){--delay:.3s} .ch:nth-child(4){--delay:.4s}
+  .sl{--offset:0s;--move-delay:calc(var(--delay) + var(--offset));
+      position:relative;display:block;height:100%;
+      animation:s-cta-char-up-down 2s infinite var(--move-delay);will-change:transform}
+  .sl:not(:first-child){position:absolute;top:0;left:0;
+      animation:s-cta-char-up-down 2s infinite var(--move-delay),
+                s-cta-char-toggle  2s linear infinite var(--toggle-delay)}
+  .sl:nth-child(2){--offset:.14s} .sl:nth-child(3){--offset:.10s} .sl:nth-child(4){--offset:.06s}
+  .ln--top .sl:not(:first-child){--toggle-delay:calc(var(--delay) + var(--offset) + .45s)}
+  .ln--bot .sl:not(:first-child){--toggle-delay:calc(var(--delay) + var(--offset) + 1.45s)}
+  .sl:nth-child(2){clip-path:inset(0 0 calc(100% - .03em) 0)}
+  .sl:nth-child(3){clip-path:inset(0 0 calc(100% - .06em) 0)}
+  .sl:nth-child(4){clip-path:inset(0 0 calc(100% - .09em) 0)}
+  .ln--bot .sl:nth-child(2){clip-path:inset(calc(100% - .03em) 0 0 0)}
+  .ln--bot .sl:nth-child(3){clip-path:inset(calc(100% - .06em) 0 0 0)}
+  .ln--bot .sl:nth-child(4){clip-path:inset(calc(100% - .09em) 0 0 0)}
+  @keyframes s-cta-char-up-down{
+    0%{transform:translateZ(0);animation-timing-function:cubic-bezier(.215,.61,.355,1)}
+    25%{transform:translate3d(0,-52%,0);animation-timing-function:cubic-bezier(.645,.045,.355,1)}
+    75%{transform:translate3d(0,52%,0);animation-timing-function:cubic-bezier(.55,.055,.675,.19)}
+    to{transform:translateZ(0)}}
+  @keyframes s-cta-char-toggle{0%{opacity:1}50%{opacity:1}50.01%{opacity:0}to{opacity:0}}
+
+  /* ── 四颗星（原片的 path 照抄）────────────────────────────────────── */
+  .stars{position:absolute;inset:0;z-index:1;scale:1.25;
+         transition:scale 2s cubic-bezier(.23,1,.32,1) .4s}
+  .dot.on .stars{scale:1}
+  .stars svg{position:absolute;width:.15em;height:auto;fill:var(--discink);
+             animation:s-cta-star-float 10s infinite cubic-bezier(.455,.03,.515,.955)}
+  .stars svg:nth-child(1){top:12%;left:25%;animation-duration:8s}
+  .stars svg:nth-child(2){top:33%;left:85%;animation-duration:9s}
+  .stars svg:nth-child(3){top:60%;left:11%;animation-duration:7s}
+  .stars svg:nth-child(4){top:83%;left:74%}
+  @keyframes s-cta-star-float{
+    0%{transform:translateZ(0)}50%{transform:translate3d(0,-15%,0) scale(.5)}to{transform:translateZ(0)}}
+
+  /* ── 半调点阵（原片 .a-dots 的等价物）─────────────────────────────
+     ★ 点必须取 `--discink`：圆本身是 `--discbg` 铺的，用底色画点等于没画。
+     ★ 间距 24px 是原片换算出来的，不是随手定的：原片 `:before` 是 200% 见方、
+       自带 48px 的 `repeating-linear-gradient` 棋盘，再 `scale(.5)` 缩一半
+       ⇒ 落在 `.a-dots` 自己的坐标里就是 24px 一格（打开时 `scale:1` 正好 24px）。
+       我这边把背景直接铺在 `.dots` 上（没有那层 200%÷.5），所以直接写 24px。
+       曾经写成 16px —— 那是"看着差不多"定的，不是量出来的。
+     ★ 原片不压透明度，点的对比是实的；点本身很小（换算后约 1.1×1.6px）才不吵。 */
+  .dots{position:absolute;top:-10%;left:-10%;width:120%;height:120%;z-index:0;
+        scale:1.1;transition:scale 1.8s cubic-bezier(.23,1,.32,1) .6s;
+        background:radial-gradient(circle,var(--discink) .75px,transparent 1.25px) 0 0/24px 24px repeat}
+  .dot.on .dots{scale:1}
+
+  /* ── 圆里那两条真链接（一盘一条）─────────────────────────────────── */
+  .links{position:absolute;top:calc(50% + var(--size) * .36);left:50%;z-index:3;
+         transform:translate3d(-50%,1em,0);opacity:0;
+         display:flex;flex-direction:column;gap:.5rem;align-items:center;
+         transition:transform 0s linear .3s,opacity 0s linear .3s}
+  .dot.on .links{opacity:1;transform:translate3d(-50%,0,0);
+         transition:transform .6s cubic-bezier(.19,1,.22,1) 1s,opacity .3s cubic-bezier(.19,1,.22,1) 1s}
+  /* ★ text-transform 必须显式写回 none：`.disc` 上那句 uppercase 会继承下来，
+     把微信号 sc15706810262 变成 SC15706810262 —— 看着没毛病，照着输加错人。 */
+  .links a{position:relative;display:block;padding:1em 1em 1em 2em;
+           background:var(--discink);color:var(--discbg);text-decoration:none;
+           font:700 14px/1 var(--mono);letter-spacing:.05em;text-transform:none;cursor:pointer}
+  .links a::before{position:absolute;top:calc(50% - 3px);left:.6em;
+           border-top:3px solid transparent;border-left:6px solid currentColor;
+           border-bottom:3px solid transparent;content:""}
+  .links a:hover,.links a:focus-visible{background:var(--discbg);color:var(--discink);
+           box-shadow:inset 0 0 0 1px var(--discink);outline:none}
+
+  /* ── 页头 ────────────────────────────────────────────────────────── */
+  #hdr{position:fixed;z-index:4;left:clamp(20px,4vw,56px);top:clamp(18px,3.6vh,40px);
+       pointer-events:none}
+  #kick{font:11px/1 var(--mono);letter-spacing:.24em;color:var(--ink3)}
+
+  /* ── 最下面那条**没铺网格**的带（网格只画到 H-128）──────────────────
+     左号 · 中 S7 标 · 右号。
+     ★ 两个号压在 `.disc` **之上**（z 6）：宽屏下它们正好落在圆的左右外侧
+       （圆占 x 286..1154），所以盘展开的那一下号就现出来了，不用等鼠标移开。
+       中间那个标反过来放在圆**之下**（z 2）—— 它在正中，必然落在圆里，
+       盘开着的时候让位给圆里的字。
+     ★ `background:var(--bg)` 那块小底片是给窄屏的：窄屏圆会摊到号底下，
+       同色底片让字压在深色圆上照样读得出来，压在页面底色上则完全看不出有底片。
+     ★ 号是**真 DOM 文本**（`user-select:all`，能选中、能 Ctrl+F、读屏读得出），
+       圆里 DOM 图形上的字不行 —— 这一条原来是 `#rows` 那份清单扛的，别省。 */
+  #footbar{position:fixed;z-index:6;left:0;right:0;bottom:0;height:128px;
+           display:flex;align-items:center;justify-content:space-between;
+           padding:0 clamp(20px,4vw,56px);pointer-events:none}
+  .fbTx{font:700 14px/1 var(--mono);letter-spacing:.05em;text-transform:none;
+        color:var(--ink);background:var(--bg);padding:5px 7px;
+        user-select:all;opacity:0;transform:translateY(6px);
+        transition:opacity .45s cubic-bezier(.2,.8,.2,1),transform .45s cubic-bezier(.2,.8,.2,1)}
+  .fbTx.on{opacity:1;transform:none;pointer-events:auto;cursor:pointer}
+  .fbTx.done{background:var(--hot);color:var(--onhot)}
+  /* 中间的标 = 页头那个 S7 的**同一对轮廓**（见 HTML 上的注释），只换颜色。
+     ★ 它 z-index 2、又钉在正中，大圆一开必然被**横切一刀**，只露下半截 ——
+       看上去像个坏字（`_ct3_E_ash.png` 上就是这个症状）。所以盘开着的时候
+       整个淡出去，实现"让位"，而不是让它被切一半。 */
+  #footicon{position:fixed;z-index:2;left:50%;bottom:0;transform:translateX(-50%);
+            height:128px;display:flex;align-items:center;pointer-events:none;
+            transition:opacity .45s cubic-bezier(.2,.8,.2,1)}
+  #footicon svg{display:block;height:42px;width:auto;fill:var(--ink)}
+  body.disc-open #footicon{opacity:0}
+
+  /* 出口：只在 iframe 里露出来（单独打开样张时没东西可退）—— 和井 / 游戏厅同一套。 */
+  #exit{position:fixed;z-index:5;right:clamp(20px,4vw,56px);top:clamp(18px,3.6vh,40px);
+        display:none;align-items:center;gap:7px;min-height:40px;padding:0 12px;
+        font:12px var(--ui);letter-spacing:.08em;color:var(--ink2);
+        background:transparent;border:1px solid var(--line);border-radius:2px;
+        cursor:pointer;transition:color .15s,border-color .15s}
+  #exit::before{content:"";width:14px;height:5px;border:1px solid currentColor;border-radius:3px}
+  #exit:hover,#exit:focus-visible{color:var(--hot);border-color:var(--hot);outline:none}
+  #exit:active::before{background:currentColor}
+
+  #hud{position:fixed;z-index:7;right:10px;bottom:10px;display:none;
+       color:#8FA3B8;font:12px/1.45 var(--mono);background:#12171Cd9;
+       padding:6px 9px;border-radius:6px;white-space:pre;pointer-events:none}
+  body.probe #hud{display:block}
+  @media(prefers-reduced-motion:reduce){
+    .sl,.stars svg{animation:none}
+    .disc,.go,.goTx,.ln,.stars,.dots,.fbTx,#footicon{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<svg id="grid" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path id="gp"></path></svg>
+
+<div id="hovers">
+  <div class="dot" data-ch="wechat">
+    <div class="go"><span class="goTx">V</span></div>
+    <div class="disc">
+      <div class="dots"></div>
+      <div class="stars">
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+      </div>
+      <!-- 两行字**重叠在圆心**，上排只露上半、下排只露下半 —— 原片是 "Let's"/"Rock"。
+           这里一盘一套：上排是代号、下排是它落到中文里的写法。 -->
+      <div class="ln ln--top"><div class="tx" data-txt="VX"></div></div>
+      <div class="ln ln--bot"><div class="tx" data-txt="微信"></div></div>
+      <div class="links"></div>
+    </div>
+  </div>
+
+  <div class="dot" data-ch="qq">
+    <div class="go"><span class="goTx">Q</span></div>
+    <div class="disc">
+      <div class="dots"></div>
+      <div class="stars">
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+        <svg viewBox="0 0 49 49"><path d="m24.5 0 3.3 21.2L49 24.5l-21.2 3.3L24.5 49l-3.3-21.2L0 24.5l21.2-3.3L24.5 0z"/></svg>
+      </div>
+      <div class="ln ln--top"><div class="tx" data-txt="QQ"></div></div>
+      <div class="ln ln--bot"><div class="tx" data-txt="Q"></div></div>
+      <div class="links"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 只有 CONTACT 一行。原来下面还挂着「联系方式」大标题和一句说明
+     （「点哪个圆，下面现哪个号。」），用户 2026-10-12：「联系方式什么的注释去掉。
+     留个 contact.」—— `#ttl` / `#sub` 两个元素连同 CSS 一起删了，
+     别在别处又加回来。 -->
+<div id="hdr">
+  <div id="kick">CONTACT</div>
+</div>
+
+<!-- 底部那条空带的中间：我们的 S7 标。构成**照抄**页头那个（`ref-hero.html`
+     的 `markSVG()`）——同一对轮廓、同一个 viewBox，只有填色跟着这一页的 `--ink`。
+     ★ 两条 path 的 `d` 由 `scripts/mk-contact-mark.py` 从 `ref-hero.html` 的
+       `G` 里现取现写（一条 758 点折线，手抄必错），改 ref-hero 后重跑那个脚本。 -->
+<div id="footbar">
+  <span class="fbTx" data-ch="wechat"></span>
+  <span class="fbTx" data-ch="qq"></span>
+</div>
+<div id="footicon"><svg viewBox="0 0 1752 1792" width="1752" height="1792" aria-hidden="true"><path d="M496 1792L480 1792L464 1791L449 1791L434 1790L419 1789L405 1787L391 1785L377 1783L364 1781L350 1779L337 1776L325 1773L312 1769L300 1766L289 1762L277 1758L266 1753L255 1749L245 1744L234 1739L225 1733L215 1727L206 1721L196 1715L188 1709L179 1702L171 1695L163 1687L156 1680L148 1672L142 1664L135 1655L128 1647L122 1637L116 1628L110 1618L105 1608L99 1598L94 1587L89 1576L85 1565L80 1553L76 1541L72 1529L69 1516L65 1504L62 1490L59 1477L56 1463L54 1449L52 1434L50 1420L48 1405L46 1389L45 1373L44 1357L43 1341L42 1324L42 1307L42 1290L42 1118L390 1118L390 1338L390 1342L390 1346L390 1350L390 1354L391 1358L391 1361L391 1365L391 1369L392 1372L392 1376L392 1379L393 1383L393 1386L394 1389L395 1392L395 1396L396 1399L397 1402L397 1405L398 1408L399 1410L400 1413L401 1416L402 1419L403 1421L404 1424L405 1426L406 1429L407 1431L408 1434L410 1436L411 1438L412 1440L414 1442L415 1444L417 1446L419 1448L420 1449L422 1451L424 1453L426 1454L428 1456L430 1457L432 1458L434 1459L436 1460L438 1462L441 1462L443 1463L445 1464L448 1465L450 1466L453 1466L456 1467L458 1467L461 1467L464 1468L467 1468L470 1468L473 1468L476 1468L479 1468L482 1468L485 1468L488 1467L491 1467L494 1466L497 1466L499 1465L502 1465L504 1464L507 1464L509 1463L511 1462L514 1461L516 1460L518 1459L520 1458L522 1457L524 1456L526 1454L528 1453L529 1452L531 1450L533 1449L534 1447L536 1445L537 1444L538 1442L540 1440L541 1438L542 1436L543 1434L544 1432L545 1430L546 1427L547 1425L548 1423L549 1420L550 1417L551 1415L551 1412L552 1409L553 1406L553 1403L554 1400L555 1397L555 1393L556 1390L556 1387L556 1383L557 1380L557 1376L557 1372L557 1368L558 1364L558 1360L558 1356L558 1352L558 1348L558 1343L558 1337L558 1332L558 1327L558 1322L557 1317L557 1312L557 1307L557 1302L556 1297L556 1292L555 1287L555 1283L555 1278L554 1274L553 1269L553 1265L552 1260L552 1256L551 1252L550 1248L549 1243L549 1239L548 1235L547 1231L546 1228L545 1224L544 1220L543 1216L542 1212L541 1209L540 1205L539 1202L537 1198L536 1194L535 1191L533 1187L532 1184L530 1180L529 1177L527 1173L525 1170L524 1166L522 1163L520 1159L518 1156L516 1152L514 1149L512 1145L510 1142L508 1139L506 1135L504 1132L501 1128L499 1125L497 1122L494 1118L492 1115L489 1112L486 1108L484 1105L481 1102L478 1098L475 1095L472 1092L469 1088L466 1085L463 1081L460 1077L457 1074L453 1070L450 1066L447 1063L443 1059L439 1055L436 1051L432 1047L428 1043L424 1039L420 1035L416 1031L412 1027L408 1023L404 1019L399 1015L395 1010L391 1006L386 1002L382 997L377 993L219 843L207 832L196 821L185 809L175 798L165 786L155 774L146 762L137 751L129 738L121 726L113 714L106 702L99 689L92 677L86 664L81 651L75 638L70 625L66 612L62 599L58 586L55 572L52 559L49 545L47 531L45 517L44 504L43 489L42 475L42 461L42 446L42 431L43 417L44 403L45 389L46 375L48 362L49 349L51 336L54 323L56 310L59 298L62 286L65 274L68 263L72 251L76 240L80 230L84 219L88 209L93 198L98 189L103 179L109 169L115 160L120 151L127 143L133 134L140 126L146 118L154 110L161 103L168 96L176 89L184 82L192 76L200 69L209 63L218 58L227 52L236 47L245 42L255 38L264 34L274 30L285 26L295 22L306 19L316 16L327 13L339 11L350 8L362 6L374 5L386 3L398 2L410 1L569 4L841 11L1013 15L1013 15L1014 15L1014 15L1014 15L1015 15L1015 15L1016 15L1016 15L1017 15L1017 15L1017 15L1018 15L1018 15L1018 15L1019 16L1019 16L1019 16L1020 17L1020 18L1020 19L1021 21L1021 22L1021 25L1021 28L1022 31L1022 35L1022 40L1022 46L1023 52L1023 60L1023 69L1023 79L1023 90L1024 102L1024 116L1024 131L1024 147L1024 164L1024 182L1025 200L1025 219L1025 238L1025 257L1025 275L1025 291L1025 305L1025 318L1025 332L1025 341L1020 341L1011 341L997 341L981 341L964 341L945 341L928 341L913 341L901 341L895 341L894 341L536 341L536 341L536 341L536 341L536 341L536 341L535 341L535 341L535 341L535 341L534 341L534 341L533 341L533 341L532 341L532 341L531 341L530 341L529 341L529 341L528 341L527 341L526 341L525 341L524 341L523 341L522 341L521 341L519 341L518 341L517 341L516 341L514 341L513 341L511 340L510 339L508 338L507 337L505 336L504 335L502 334L500 333L499 332L497 331L495 330L493 330L491 329L490 328L488 328L486 327L484 327L482 326L480 326L478 325L476 325L473 325L471 325L469 324L467 324L465 324L462 324L460 324L457 324L454 324L452 324L449 324L447 325L444 325L442 325L439 326L437 326L434 327L432 327L430 328L428 328L426 329L424 330L422 331L420 332L418 332L416 333L414 334L412 336L410 337L409 338L407 339L406 340L404 342L403 343L401 344L400 346L398 348L397 349L396 351L395 352L394 354L393 356L391 357L390 359L389 361L389 363L388 365L387 367L386 368L385 370L385 372L384 374L383 376L383 378L382 381L382 383L381 385L381 387L380 389L380 391L380 394L380 396L379 398L379 401L379 403L379 406L379 408L379 410L379 413L379 415L379 418L380 420L380 423L380 426L380 428L381 431L381 433L382 436L382 439L383 441L383 444L384 446L385 449L385 452L386 455L387 457L388 460L389 463L390 465L391 468L392 471L393 474L394 477L395 479L396 482L398 485L399 488L400 491L402 494L403 497L405 500L407 503L409 506L410 509L412 512L415 515L417 518L419 521L421 524L424 528L426 531L429 534L431 538L434 541L437 544L440 548L443 551L446 555L449 558L453 562L456 565L459 569L463 572L467 576L470 580L474 583L478 587L681 782L685 786L689 790L693 794L697 798L701 802L705 805L709 809L713 813L717 817L721 821L724 825L728 829L732 833L736 838L740 842L743 846L747 850L751 854L754 858L758 862L761 866L765 871L769 875L772 879L776 883L779 887L783 892L786 896L790 900L793 904L796 909L800 913L803 918L806 922L809 927L813 931L816 936L819 940L822 945L825 950L828 955L831 959L833 964L836 969L839 974L842 979L844 984L847 989L850 995L852 1000L855 1005L857 1010L859 1016L862 1021L864 1027L866 1032L869 1038L871 1043L873 1049L875 1054L877 1060L879 1066L881 1072L883 1078L884 1084L886 1090L888 1096L889 1103L891 1109L892 1116L894 1122L895 1129L896 1136L897 1142L898 1149L899 1156L900 1163L901 1171L902 1178L903 1185L903 1193L904 1200L904 1208L905 1215L905 1223L905 1231L906 1239L906 1247L906 1255L906 1263L906 1279L906 1296L905 1312L904 1327L903 1343L902 1358L901 1373L899 1388L898 1402L896 1416L894 1430L891 1444L889 1458L886 1471L883 1484L880 1497L877 1510L873 1522L869 1534L865 1546L861 1558L857 1569L852 1580L847 1591L842 1602L837 1612L832 1622L826 1632L820 1642L814 1652L808 1661L802 1670L795 1678L788 1686L780 1694L772 1702L764 1709L756 1716L747 1723L738 1730L729 1736L720 1741L710 1747L700 1752L689 1757L678 1761L667 1766L656 1770L644 1773L632 1776L620 1779L607 1782L595 1784L581 1786L568 1788L554 1790L540 1791L526 1791L511 1792L496 1792Z" transform="translate(-42 0)"/><path d="M145 1775C156 1611 179 1458 214 1315C249 1172 290 1040 336 916C382 794 426 681 469 578L567 341L70 341L70 15L958 15L958 207C958 278 946 349 923 421C900 493 869 572 831 659C748 847 682 1034 634 1220C584 1407 554 1592 543 1775Z" transform="translate(794 0)"/></svg></div>
+
+<button id="exit" type="button" aria-label="返回小镇">返回小镇</button>
+<div id="hud"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ══ 数据 ═══════════════════════════════════════════════════════════
+   ★ 号是**真值**（用户给的），别改。同一份值必须也以真文本存在于 DOM 清单里
+   （见 collect()）—— 只画在 canvas/DOM 图形上的字选不中、Ctrl+F 搜不到。 */
+var CHANNELS = [
+  { key:"wechat", label:"微信", value:"sc15706810262" },
+  { key:"qq",     label:"QQ",   value:"1239486160"   }
+];
+
+var Q = new URLSearchParams(location.search);
+function num(k, d){ var v = parseFloat(Q.get(k)); return isFinite(v) ? v : d; }
+var REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches || Q.get("reduce") === "1";
+if (Q.get("probe") !== null) document.body.classList.add("probe");
+
+/* ── 两套撞色 ───────────────────────────────────────────────────────
+   原片规则：**底色 = 那个饱和色，圆 = 深色，圆里的字 = 底色**。
+     mint 照抄这条规则（饱和绿铺一屏，圆和网格线都是深色）。
+     ash  把它翻过来：深灰铺底，薄荷绿只落在网格线和圆里的字上 ——
+          量小、像一次强调，而不是刷满一屏荧光绿。
+   ★ 线比底**暗**还是**亮**，是跟着底色走的，不是风格选择：原片底色亮、线暗。
+     深色底上照抄"线比底暗"就等于没画。 */
+var PALS = {
+  mint: {
+    vars:{ "--bg":"#00F5A0", "--gridline":"#06231A",
+           "--discbg":"#0A0D10", "--discink":"#00F5A0",
+           "--ink":"#06231A", "--ink2":"rgba(6,35,26,.72)", "--ink3":"rgba(6,35,26,.5)",
+           "--line":"rgba(6,16,12,.30)", "--hot":"#0A0D10", "--onhot":"#00F5A0" }
+  },
+  ash: {
+    vars:{ "--bg":"#282D32", "--gridline":"rgba(0,245,160,.26)",
+           "--discbg":"#0E1216", "--discink":"#00F5A0",
+           "--ink":"#E7EDF3", "--ink2":"#9FABB8", "--ink3":"#6E7A87",
+           "--line":"#39414A", "--hot":"#00F5A0", "--onhot":"#0A0D10" }
+  }
+};
+var palName = Q.get("pal") === "ash" ? "ash" : "mint";
+(function(){ var R = document.documentElement.style, v = PALS[palName].vars;
+  for (var k in v) R.setProperty(k, v[k]); })();
+
+/* ── 旋钮（?xxx= 可现场调）───────────────────────────────────────── */
+var P = {
+  vlines: num("vl", 0),      // 0 = 自动：>767px 用 12 列，否则 8
+  wspeed: num("ws", 15),     // 波动扫的速度（px/帧 @60fps）
+  wstr:   num("wstr", 1),    // 波动强度
+  dsz:    num("dsz", 0)      // 0 = 自动：min(宽,高)-32
+};
+
+var stage = document.body;
+var gp = document.getElementById("gp");
+var hud = document.getElementById("hud");
+var footEl = document.getElementById("footbar");
+/* ★ 一个渠道一份：小圆 · 大圆 · 圆里那条链接 · 底部那个号。
+   全按 `data-ch` 取，**不靠 DOM 顺序**——顺序错了两盘会静默对调，
+   而要发现得两个渠道都点一遍才看得出来。 */
+function q(sel, key){ return document.querySelector(sel.replace("%k", key)); }
+var dotOf   = function(k){ return q('.dot[data-ch="%k"]', k); };
+var discOf  = function(k){ return q('.dot[data-ch="%k"] .disc', k); };
+var goTxOf  = function(k){ return q('.dot[data-ch="%k"] .goTx', k); };
+var fbOf    = function(k){ return q('#footbar .fbTx[data-ch="%k"]', k); };
+
+/* 每行字排成 4 层切片（原片每个字符 4 个 s__cta__char__slice） */
+document.querySelectorAll(".tx").forEach(function(box){
+  var word = box.dataset.txt || "";
+  box.textContent = "";
+  for (var i = 0; i < word.length; i++){
+    var ch = document.createElement("span"); ch.className = "ch";
+    for (var k = 0; k < 4; k++){
+      var sl = document.createElement("span"); sl.className = "sl";
+      sl.textContent = word[i];
+      ch.appendChild(sl);
+    }
+    box.appendChild(ch);
+  }
+});
+
+/* 号在两个地方各来一份，缺一不可：
+     ① 圆里那条链接（`#links` 的等价物）—— 展开那盘里就能点着复制；
+     ② 底部那条带上的号 —— **真 DOM 文本**，能选中、能 Ctrl+F、读屏读得出。
+   ①是 DOM 图形、②才是文本，所以"号有没有丢"这件事**要看两处**。 */
+CHANNELS.forEach(function(ch){
+  var a = document.createElement("a");
+  a.href = "#" + ch.key;
+  a.textContent = ch.label + "：" + ch.value;
+  /* ★ 必须 stopPropagation：这条链接在 `.dot` 里面，点它会冒泡到小圆那个
+     click（那里是"开/合"开关）—— 不拦的话**点复制等于顺手把盘收了**，
+     而 `doCopy` 刚把 `.done` 加到一个正在收起的元素上，用户看到的是"闪了一下"。 */
+  a.addEventListener("click", function(ev){
+    ev.preventDefault(); ev.stopPropagation(); doCopy(ch.value, a); });
+  discOf(ch.key).querySelector(".links").appendChild(a);
+
+  var t = fbOf(ch.key);
+  t.textContent = ch.label + "：" + ch.value;
+  t.addEventListener("click", function(){ doCopy(ch.value, t); });
+});
+
+/* ══ 网格 ══════════════════════════════════════════════════════════
+   实测自原站 bundle 里的 `class bc`，公式逐行照搬：
+     gapX = 宽 / 列数        gapY = (视口高 - 8rem - 2px) / 8
+     圆心在 (宽/2, 视口高 × .45)   ← 这一条是**从截图量的**，不是公式推的
+     静态造型：每点从圆心沿径向外推 (宽/2 / dist) * 5（反比，离圆心越近推得越狠）
+   唯一改动：把"每帧 ×.9"换成"按 dt 折算"，否则波动快慢会跟着刷新率变。 */
+var S = { vLines:12, gapX:0, gapY:0, hLines:0, W:0, H:0, contH:0, ctaMaxSize:0,
+          cx:0, cy:0, reach:0, pts:[] };
+var WAVE = { progress:0, op:0, speed:15, strength:1, state:"pulse" };
+var BAND = 30;                 /* 波动那圈有多宽（原片：|dist - progress| < 30） */
+
+/* ★ 波动要扫到**多远**才算扫完 —— 这个值写错会让网格永远回不到矩形。
+   判据是"圆心到最远那个点的距离 + 波宽"：只要有一个点在扫完后仍落在
+   |dist - progress| < BAND 的环里，它就会被**每帧**推一次，网格收敛到一个
+   鼓着的稳态，再也不动。实测栽过：上限写成 S.H（900），而最远点 dist = hypot(720,495) = 874，
+   差 26 < 30 —— progress 恰好停在 900 时右下角一圈点被无限推，
+   maxDev 卡在 35px 整整两秒不衰减，看着像"余波很慢"，其实是稳态。
+   原片没这毛病只是巧合：它的 grid.height 比最大 dist 大得多。 */
+function waveReach(){
+  var far = Math.hypot(Math.max(S.cx, S.W - S.cx), Math.max(S.cy, S.H - S.cy));
+  return far + BAND + 1;
+}
+
+function setSize(){
+  S.W = document.documentElement.clientWidth;
+  S.H = document.documentElement.clientHeight;
+  S.contH = Math.max(200, S.H - 128);        /* 原片：calc(100vh - 8rem - 2px)，1rem=16px 时是 128 */
+  S.ctaMaxSize = P.dsz > 0 ? Math.min(S.W, S.H) * P.dsz : Math.min(S.W, S.H) - 32;
+  /* 两盘的 `--size` 得一起设 —— 只设一盘的症状是"另一盘的字小一半"，
+     而它在收起状态下完全看不出来（`--size` 只影响展开后的字号和圆半径）。 */
+  CHANNELS.forEach(function(ch){ discOf(ch.key).style.setProperty("--size", S.ctaMaxSize + "px"); });
+}
+
+function setGrid(){
+  var e = S.W, i = S.H;
+  S.vLines = P.vlines > 0 ? (P.vlines | 0) : (window.innerWidth > 767 ? 12 : 8);
+  S.gapX = e / S.vLines;
+  S.gapY = S.contH / 8;
+  S.hLines = Math.floor(i / S.gapY);
+  var rem = i - S.gapY * S.hLines;           /* 除不尽的余数补在最后一格 */
+  S.cx = e / 2;
+  S.cy = i * 0.45;                           /* ★ 从原片截图量的：1440x900 下圆心在 y≈404 */
+  S.reach = waveReach();                     /* 必须在 cx/cy/W/H 都定好之后再算 */
+  S.pts = [];
+  for (var n = 0; n <= S.vLines; n++){
+    var col = [];
+    for (var a = 0; a <= S.hLines; a++){
+      var l = { x:S.gapX*n, y:S.gapY*a + (a !== 0 ? rem : 0),
+                vx:0, vy:0, wx:0, wy:0, mx:0, my:0, ox:0, oy:0, dx:0, dy:0, dist:0 };
+      var h = l.x - S.cx, c = l.y - S.cy, p = Math.atan2(c, h);
+      l.dist = Math.hypot(h, c);
+      if (l.dist === 0){ l.dx = 0; l.dy = 0; }
+      else { l.dx = Math.cos(p) * (e/2/l.dist) * 5;
+             l.dy = Math.sin(p) * (e/2/l.dist) * 5; }
+      col.push(l);
+    }
+    S.pts.push(col);
+  }
+  /* 两个小圆落到**网格线的交汇处**上：中线左右各一格、离 cy 最近的那一行。
+     ★ y 必须带上那个 `rem`。`setGrid` 给**所有 a≠0 的行**都加了它（除不尽的
+       余数），照着"网格从 0 开始"写会让两个点整体高 31.5px、正好落进格子**中间** ——
+       看着"差不多在线上"，`_logs/_gridpts.py` 一量才现原形（残差 −31.5）。
+     ★ 列取中线**左右各一格**（12 列时是第 5 / 第 7 列，x=600 / 840），不是相邻的
+       第 5/6 列 —— 后者中点落在 660，两个点整体偏左，而"偏左"单看一个点看不出来。
+     ★ 这是**唯一**一处算小圆落点的地方，`resized()` 走的就是它，别在别处再算一遍。 */
+  var nc = Math.round(S.vLines / 2), na = Math.max(1, Math.round((S.cy - rem) / S.gapY));
+  var rv = document.documentElement.style;
+  rv.setProperty("--pxL", (S.gapX * (nc - 1)).toFixed(2) + "px");
+  rv.setProperty("--pxR", (S.gapX * (nc + 1)).toFixed(2) + "px");
+  rv.setProperty("--py",  (S.gapY * na + rem).toFixed(2) + "px");
+}
+
+function easeOut(t){ return t === 1 ? 1 : 1 - Math.pow(2, -10*t); }
+
+function movePoints(k){
+  var diag = Math.hypot(S.W, S.H);
+  var live = WAVE.state !== "paused";            /* 扫完了就只让弹簧回弹，不再给冲量 */
+  for (var ci = 0; ci < S.pts.length; ci++){
+    var col = S.pts[ci];
+    for (var o = 0; o < col.length; o++){
+      var n = col[o];
+      if (o === 0 || n.dist === 0) continue;      /* 顶行不参与 */
+      if (live){
+        var a = Math.abs(n.dist - WAVE.progress);
+        if (a < BAND){
+          var hh = 1 - a/BAND, cc = Math.atan2(n.dy, n.dx), pp = Math.cos(a*.01) * hh;
+          n.vx += Math.cos(cc) * pp * BAND*.5 * WAVE.strength * k;
+          n.vy += Math.sin(cc) * pp * BAND*.5 * WAVE.strength * k;
+        }
+      }
+      n.vx += (0 - n.wx) * .001 * k;
+      n.vy += (0 - n.wy) * .001 * k;
+      var d = Math.pow(.9, k);
+      n.vx *= d;  n.vy *= d;
+      n.wx += n.vx * 3 * k;
+      n.wy += n.vy * 3 * k;
+      n.wx *= d;  n.wy *= d;
+      n.mx = n.wx * .1;  n.my = n.wy * .1;
+      var ox = easeOut(n.dx / diag), oy = easeOut(n.dy / diag);
+      n.ox = ox * S.gapX * 75 * (n.dist / S.ctaMaxSize);
+      n.oy = oy * S.gapY * 75 * (n.dist / S.ctaMaxSize);
+    }
+  }
+}
+
+function movedPoint(t){ return { x: t.x + t.mx + t.ox * WAVE.op, y: t.y + t.my + t.oy * WAVE.op }; }
+
+function drawLines(){
+  var d = "", k, q;
+  for (var ci = 0; ci < S.pts.length; ci++){            /* 竖线 */
+    var col = S.pts[ci];
+    for (k = 0; k < col.length; k++){
+      q = movedPoint(col[k]);
+      d += (k === 0 ? "M " : "L ") + q.x.toFixed(1) + " " + q.y.toFixed(1) + " ";
+    }
+  }
+  for (var i = 0; i < S.hLines; i++)                     /* 横线 */
+    for (k = 0; k < S.pts.length; k++){
+      q = movedPoint(S.pts[k][i]);
+      d += (k === 0 ? "M " : "L ") + q.x.toFixed(1) + " " + q.y.toFixed(1) + " ";
+    }
+  gp.setAttribute("d", d);
+}
+
+/* ══ 圆里 "GO" 的呼吸 + 每轮触发一次波动 ══════════════════════════
+   原片用 GSAP：fromTo(scale .85→1.05, 2.7s, power2.in) → call(wavePulse) →
+   to(scale .85, .15s, power4.out)，repeat:-1 repeatDelay:.5 ⇒ 一轮 3.35s */
+var T0 = 0;
+var noAuto = false;          /* 探针/出图用：临时掐掉自动波动，好拍"干净窗口" */
+function pulse(now){
+  if (!T0) T0 = now;
+  var t = (now - T0) % 3350, sc;
+  if (t < 2700) sc = .85 + .20 * Math.pow(t/2700, 2);                    /* power2.in */
+  else {
+    /* ★ `u` 必须夹住。原片这条是 GSAP 的 `to(..., .15s)` —— 150ms 到点就**停**，
+       2700→3350 剩下的 500ms 是 repeatDelay，缩放一直停在 0.85。手算公式没有
+       "停"这回事：t>2850 时 1-(t-2700)/150 变负，四次方转正且**越涨越大** ——
+       t=3217 时 sc=-6.1、t=3285 时 sc=-13.1。
+       原片只有一个圆，放大十几倍只是盖住自己，看不出来；现在两个圆并排，
+       QQ 那个 `.goTx` 被放到 275px 宽、左边缘正好扫到微信圆心 (652,405) ——
+       指针底下的人每帧换一次身份，mouseenter/mouseleave 就每帧翻一次。
+       `_logs/_dbg_reveal.py` 实测：t≈3217 起 body.class 在 ''/disc-open 之间
+       以 16.5ms 为周期**无限翻转**，`openCh` 跟着在 wechat/qq 之间跳，
+       症状是"两个渠道的号同时现出来"。 */
+    var u = Math.min(1, (t - 2700) / 150);
+    sc = 1.05 - .20 * (1 - Math.pow(1 - u, 4));                          /* power4.out */
+    if (!pulse.fired && !openCh && !noAuto) wavePulse();
+  }
+  pulse.fired = t >= 2700;
+  /* 呼吸只给**没展开**的那个圆。展开那盘的缩放由 CSS 管（`.dot.on .goTx{scale:2}`），
+     这里是 `transform` —— `scale` 和 `transform` 是两个独立属性、互不覆盖，
+     所以两边可以各管各的，不用互相让路。 */
+  CHANNELS.forEach(function(ch){
+    goTxOf(ch.key).style.transform =
+      (openCh === ch.key) ? "" : "scale(" + sc.toFixed(4) + ")";
+  });
+}
+pulse.fired = false;
+
+function wavePulse(){ WAVE.progress = 0; WAVE.state = "pulse"; WAVE.speed = P.wspeed; WAVE.strength = P.wstr; }
+function waveShock(){ WAVE.progress = 0; WAVE.state = "shock"; WAVE.speed = P.wspeed*2; WAVE.strength = P.wstr*5; }
+
+/* ══ 开 / 合 ══════════════════════════════════════════════════════
+   原片是 hover 才展开。本页 **hover 或点击都开** —— iframe 里和触屏上
+   hover 靠不住，而这一页在手机上也要能用。收起只有一条路：指针离开。
+   ★ `openCh` 是**渠道 key**（null = 都收着），不是布尔 —— 两盘各记各的，
+     换成布尔就永远分不出开的是哪一盘，而两盘长得一模一样，看图分不出。 */
+var openCh = null, opTween = null;
+
+function expoInOut(p){
+  if (p <= 0 || p >= 1) return p;
+  return p < .5 ? Math.pow(2, 20*p - 10) / 2 : (2 - Math.pow(2, -20*p + 10)) / 2;
+}
+function tweenOp(to, dur){
+  if (opTween) cancelAnimationFrame(opTween);
+  var from = WAVE.op, t0 = 0;
+  opTween = requestAnimationFrame(function stepOp(now){
+    /* ★ 基准取**这一帧自己的时间戳**，不能取调用时的 performance.now()：
+       rAF 传的是帧的**开始**时刻，可以早于 performance.now()，于是 (now-t0) 为负、
+       p 为负、expoInOut 原样返回负数、op 被推到 0 以下。实测过 op=-0.001
+       —— 看着没事，但网格从此永远带一个非零偏移，再也不精确静止。 */
+    if (!t0) t0 = now;
+    var p = Math.min(1, (now - t0) / dur);
+    WAVE.op = from + (to - from) * expoInOut(p);
+    opTween = (p < 1) ? requestAnimationFrame(stepOp) : null;
+  });
+}
+/* `key` = 要开的那一盘；`null` = 都收着。 */
+function setOpen(key){
+  if (key === openCh) return;
+  openCh = key;
+  /* ★ 这一个类同时管三件事，必须**在这一处**翻，别散到各个入口去
+     （hover / click / 触屏 / `?open=` 四条路都走 setOpen，漏一条就是静默不一致）：
+       1. 两个小圆画成透明但留住命中区（否则够不到另一个渠道）
+       2. 底部正中的 S7 标让位（否则被大圆横切一刀）
+       3. 探针的硬判据 —— "盘开着"这件事有地方可读 */
+  document.body.classList.toggle("disc-open", !!key);
+  CHANNELS.forEach(function(ch){
+    dotOf(ch.key).classList.toggle("on", ch.key === key);
+  });
+  if (key){
+    /* 点开哪一盘，底部那个号就现出来。圆里的链接**不算数** —— 它是 DOM 图形，
+       选不中、Ctrl+F 搜不到；底部那份才是真文本。 */
+    reveal(key);
+    setTimeout(function(){ if (openCh === key) waveShock(); }, 600);
+    tweenOp(1, 1200);
+  } else {
+    tweenOp(0, 700);
+  }
+}
+
+CHANNELS.forEach(function(ch){
+  var d = dotOf(ch.key);
+  d.addEventListener("mouseenter", function(){ setOpen(ch.key); });
+  /* ★ 必须判 `openCh === ch.key` 才收：鼠标从 V 划到 Q 时，V 的 mouseleave 可能
+     排在 Q 的 mouseenter **之后** —— 不判的话刚开的 Q 会被 V 的离开顺手关掉。 */
+  d.addEventListener("mouseleave", function(){ if (openCh === ch.key) setOpen(null); });
+  d.addEventListener("click", function(e){
+    e.stopPropagation(); setOpen(openCh === ch.key ? null : ch.key);
+  });
+  /* 触屏：touchstart 里 mouseenter 不会来，得自己开 */
+  d.addEventListener("touchstart", function(e){ e.stopPropagation(); setOpen(ch.key); }, {passive:true});
+});
+
+/* ── 底部那条带上的号 ──────────────────────────────────────────────
+   ★ 文本在**建链接那一步就写死了**（见上面的 CHANNELS.forEach），这里只管"露不露"。
+     所以号从一开始就在 DOM 里：`opacity:0` 照样被 Ctrl+F、读屏、选中逮到，
+     "点过才现"只是视觉上的事。 */
+var shown = {};
+function reveal(key){
+  if (shown[key]) return;
+  shown[key] = true;
+  var t = fbOf(key);
+  if (REDUCE) t.style.transition = "none";   /* `?reduce=1` 是 JS 变量，踩不到 CSS 那条 media */
+  t.classList.add("on");
+}
+function doCopy(text, btn){
+  /* 只变色、**不改文本** —— 底部那个号本身就是内容（"微信：sc15…"），
+     换成"已复制"等于把号擦掉了。 */
+  function ok(){ if(!btn) return; btn.classList.add("done");
+    setTimeout(function(){ btn.classList.remove("done"); }, 1300); }
+  function fallback(){
+    /* file:// / iframe 里 navigator.clipboard 可能不给用，退回老办法；
+       再不行就把值选中让人自己 Ctrl+C —— 反正它是真文本。 */
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly","");
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    var done = false;
+    try { done = document.execCommand("copy"); } catch(e){ done = false; }
+    document.body.removeChild(ta);
+    if (!done){
+      var el = btn || document.querySelector(".fbTx.on"), sel = getSelection();
+      if (el && sel){ sel.removeAllRanges(); var rg = document.createRange();
+                      rg.selectNodeContents(el); sel.addRange(rg); }
+    }
+    ok();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(ok, fallback);
+  } else fallback();
+}
+
+/* ── Esc 分两级：圆开着先收（那才是眼前正在发生的事），收着才退出去。
+   ★ 焦点在父页时这个监听器**一个键都收不到** —— 父页会转发 `well-esc`，
+     所以两级判据写成 onEsc() 一个函数、两处共用，别写两份。 */
+function onEsc(){ if (openCh) setOpen(null); else wellSay("well-exit"); }
+addEventListener("keydown", function(e){ if (e.key === "Escape") onEsc(); });
+
+/* ── 每帧 ───────────────────────────────────────────────────────── */
+var T = 0, last = 0;
+function step(dt){
+  T += dt;
+  if (REDUCE) return;
+  if (WAVE.state === "paused") return;
+  WAVE.progress += WAVE.speed * (dt / (1/60));
+  /* 扫到头就把状态钉死成 paused —— 与其靠"progress 够不够大"间接判断，
+     不如让"这一发结束了"成为一件明确的事。movePoints 认的就是这个状态。 */
+  if (WAVE.progress >= S.reach){ WAVE.progress = S.reach; WAVE.state = "paused"; }
+}
+function frame(now){
+  var dt = last ? Math.min(0.05, (now - last) / 1000) : 1/60;
+  last = now;
+  step(dt);
+  movePoints(dt / (1/60));
+  if (REDUCE) WAVE.op = openCh ? 1 : 0;
+  drawLines();
+  pulse(now);
+  if (Q.get("probe") !== null){
+    hud.textContent =
+      "open  " + (openCh || "-") + "\nwave  " + WAVE.progress.toFixed(0) + " / " + WAVE.state +
+      "\nop    " + WAVE.op.toFixed(3) +
+      "\nopts  " + (typeof OffscreenCanvas !== "undefined" ? "-" : "-") +
+      "\ngot   " + Object.keys(shown).join(",") +
+      "\ngrid  " + S.vLines + " x " + S.hLines + "  gap " + S.gapX.toFixed(0) + "x" + S.gapY.toFixed(1) +
+      "\nd     " + gp.getAttribute("d").length + " chars" +
+      "\nT     " + T.toFixed(2);
+  }
+  raf = requestAnimationFrame(frame);
+}
+
+/* ── 探针接口 ─────────────────────────────────────────────────────
+   ★ 探针只从这里拿屏幕坐标去点，**不能在探针里自己按公式反推** ——
+     那等于拿页面自己的公式给自己作证，公式错了两边一起错。 */
+window.__contactProbe = {
+  /* ★ 两个读数**都要**：`open` 是旧的布尔判据（"有没有盘开着"），
+     `openCh` 才是"开的是哪一盘" —— 两盘长得一模一样，只看布尔分不出开错了哪盘。 */
+  get open(){ return !!openCh; },
+  get openCh(){ return openCh; },
+  get shown(){ return Object.keys(shown); },
+  get collected(){ return Object.keys(shown); },   /* 旧名，向后兼容 */
+  /* `gate` / `running` 是"闸到底冻住没有"的**硬判据** —— 光看图分不出
+     "冻在第 0 帧"和"已经跑了一会儿但刚好停在那儿"。
+     ★ `t` 是那个**会变的对照量**：只读 `gate` 是拿页面自己的旗子给自己作证，
+       两次采样 `t` 一样才说明钟真的停了。 */
+  get gate(){ return GATE; },
+  get running(){ return raf > 0; },
+  get t(){ return +T.toFixed(3); },
+  get grid(){ return { W:S.W, H:S.H, vLines:S.vLines, gapX:+S.gapX.toFixed(2), gapY:+S.gapY.toFixed(2),
+                       hLines:S.hLines, cx:+S.cx.toFixed(1), cy:+S.cy.toFixed(1), cols:S.pts.length }; },
+  get wave(){ return { progress:+WAVE.progress.toFixed(1), op:+WAVE.op.toFixed(3),
+                       speed:WAVE.speed, strength:WAVE.strength, state:WAVE.state }; },
+  /* ★ 不过 toFixed 的原始读数：`wave.op` 是三位小数，0.0004 会读成 0 ——
+     排查"网格为什么不是直的"时，四位小数和三位小数的区别就是"看不见"和"看得见"。 */
+  get opRaw(){ return WAVE.op; },
+  /* 全网格里**偏理想位置最远**的那个点偏了多少 px。
+     这是判"网格直不直"的唯一可用判据 —— 单看一个点会看错轴：
+     若那个点正好在圆心正上/下方，它的径向就是竖直的，x 恒不变，
+     于是"x 精确等于理想值"看着像"网格是直的"，其实 y 早就被推飞了。
+     op=0 且波动余波落尽时必须趋近 0。 */
+  maxDev: function(){
+    var m0 = 0;
+    for (var ci = 0; ci < S.pts.length; ci++)
+      for (var ai = 0; ai < S.pts[ci].length; ai++){
+        var p = S.pts[ci][ai], m = movedPoint(p);
+        var d = Math.hypot(m.x - p.x, m.y - p.y);
+        if (d > m0) m0 = d;
+      }
+    return +m0.toFixed(2);
+  },
+  /* 一个控制点的**实际坐标**。判"网格直不直"用这个当硬判据：
+     op=0 且余波衰减完时，第 n 列第 a 行必须**精确等于** (gapX*n, gapY*a)。 */
+  ptAt: function(ci, ai){
+    var p = S.pts[ci] && S.pts[ci][ai]; if (!p) return null;
+    var m = movedPoint(p);
+    return { x:+m.x.toFixed(2), y:+m.y.toFixed(2),
+             wantX:+(S.gapX*ci).toFixed(2),
+             wantY:+(S.gapY*ai + (ai !== 0 ? S.H - S.gapY*S.hLines : 0)).toFixed(2),
+             mx:+p.mx.toFixed(3), my:+p.my.toFixed(3), op:+WAVE.op.toFixed(4) };
+  },
+  get dLen(){ return gp.getAttribute("d").length; },
+  get discSize(){ return S.ctaMaxSize; },
+  /* 四个**屏幕矩形**，探针拿去点真东西（第 ci 个小圆 / 那一盘的大圆 /
+     那一盘里的链接 / 底部那条带上第 ci 个号）。ci：0=微信，1=QQ。
+     ★ 一律**现量 getBoundingClientRect**，不在探针里按公式反推坐标。 */
+  pixRect: function(ci){ var r = dotOf(CHANNELS[ci||0].key).getBoundingClientRect();
+    return [Math.round(r.left + r.width/2), Math.round(r.top + r.height/2), Math.round(r.width/2)]; },
+  discRect: function(ci){ var r = discOf(CHANNELS[ci||0].key).getBoundingClientRect();
+    return [Math.round(r.left + r.width/2), Math.round(r.top + r.height/2), Math.round(r.width/2)]; },
+  linkRect: function(ci){
+    var a = discOf(CHANNELS[ci||0].key).querySelector(".links").children[0]; if (!a) return null;
+    var r = a.getBoundingClientRect();
+    return [Math.round(r.left + r.width/2), Math.round(r.top + r.height/2),
+            Math.round(r.width), Math.round(r.height)];
+  },
+  href: function(ci){
+    var a = discOf(CHANNELS[ci||0].key).querySelector(".links").children[0];
+    return a ? a.textContent : null;
+  },
+  /* 底部那条带上第 ci 个号的屏幕矩形 + 它现在露没露。
+     `op` 是**算出来的不透明度**：`.on` 加上去之后 CSS 还要过渡 .45s，
+     只读 classList 会在"加了类但还没显形"时误判成已经出现。 */
+  footRect: function(ci){
+    var t = fbOf(CHANNELS[ci||0].key), r = t.getBoundingClientRect();
+    return [Math.round(r.left + r.width/2), Math.round(r.top + r.height/2),
+            Math.round(r.width), Math.round(r.height)];
+  },
+  footOp: function(ci){
+    var t = fbOf(CHANNELS[ci||0].key);
+    return +parseFloat(getComputedStyle(t).opacity).toFixed(3);
+  },
+  footText: function(ci){ return fbOf(CHANNELS[ci||0].key).textContent; },
+  /* 定格到"某一盘展开完毕"，供截图和排查用。**走和真实交互同一条路**（setOpen），
+     不是另写一套定格 —— 另写一套的话拍到的就不是用户会看到的东西。
+     `key` 省略时开第一盘（老调用点的 `snap()` 就是这个意思）。 */
+  snap: function(key){ setOpen(key || CHANNELS[0].key); WAVE.op = 1; return this.grid; },
+  shut: function(){ setOpen(null); WAVE.op = 0; return true; },
+  setWave: function(o){ for (var k in o) WAVE[k] = o[k]; return this.wave; },
+  /* 关掉自动波动（每 3.35s 一发）。出图和排查都要它 —— 否则你永远不知道
+     拍到的是"静止态"还是"某一发的余波"，两次截图之间也没有可比性。
+     只掐自动的那一发；手动的 pulse()/shock() 照打。 */
+  setAuto: function(on){ noAuto = !on; return noAuto; },
+  pulse: wavePulse, shock: waveShock,
+  step: function(dt){ step(dt); movePoints(dt/(1/60)); drawLines(); return true; },
+  geom: function(){ return { pix:this.pixRect(), disc:this.discRect(),
+                             size:S.ctaMaxSize, pal:palName }; }
+};
+
+/* ── 跨文档：挂进小镇时用的那四个暗号 ═══════════════════════════════
+   和井 / 开发室 / 游戏厅 / 文字墙**同一套**，父页不必为本页分叉：
+
+     well-hello  子→父  报到
+     well-go     父→子  解闸（父页在幕开始让开的那一刻发）
+     well-esc    父→子  焦点在父页时，父页转发的 Escape ⇒ 这里回 onEsc()
+     well-exit   子→父  请求退出，父页收到调 sceneExit()
+
+   ★ `wellSay` 先判 `parent !== window`：单独打开样张时别把消息发给自己
+     （发给自己会被自己的 message 监听器吃回去，白绕一圈还没症状）。
+   ★ 父页**不认 `e.origin`**（file:// 下它不透明），只认 `what` 字段。 */
+function wellSay(what){
+  if (window.parent && window.parent !== window)
+    window.parent.postMessage({ what: what }, "*");
+}
+
+/* ── 初始化 ─────────────────────────────────────────────────────── */
+var raf = 0;
+
+function resized(){
+  setSize(); setGrid(); drawLines();
+  /* ★ 圆的大小变了，`--size` 跟着变，但小圆的尺寸是 CSS 死的 6rem —— 不冲突。
+     这里只重画网格：pts 整个换掉了，不重画就是一张旧网格挂在新尺寸上。 */
+}
+addEventListener("resize", resized);
+
+resized();
+
+/* ?open=wechat|qq|1 —— 开机就展开到终态。截图和排查用：
+   "展开长什么样"这件事必须能**不出手**就拍到，否则每次都得模拟点击。
+   `1`（或 `0`/`false` 以外的任何真值）向后兼容成"开第一盘"。 */
+(function(){
+  var a = Q.get("open");
+  if (a === null || a === "0" || a === "false") return;
+  setOpen(a === "qq" ? "qq" : "wechat"); WAVE.op = 1;
+})();
+
+/* ── 入场闸 `?gate=1` ───────────────────────────────────────────────
+   ★ 闸的方式是"**连 rAF 都不起**"，不是"起了但每帧不动"。这一页的时间全在
+     frame() 里推进（波动、呼吸、op 缓动），不跑帧就是货真价实地冻在第 0 帧。
+   ★ 但网格不是"等帧才画"的 —— resized() 已经跑过一遍 drawLines()，所以
+     冻住时**网格和小圆照样在**（原片那套本来就是 DOM + SVG，不是 canvas）。
+     冻住的只是波动和呼吸。 */
+var GATE = Q.has("gate");
+if (REDUCE){
+  /* 减少动态：两个号直接在底部摆出来（无过渡），网格画好摆着不动 */
+  CHANNELS.forEach(function(ch){ reveal(ch.key); });
+} else if (!GATE){
+  raf = requestAnimationFrame(frame);
+}
+
+addEventListener("message", function(e){
+  var d = e.data;
+  if (!d || typeof d !== "object") return;
+  if (d.what === "well-go"){
+    /* 解闸就起钟。这一页不需要父页另给一个"起点"：入场就是网格摆好、波动开始，
+       什么时候让人看见就什么时候开始。
+       `raf` 先判空：`well-go` 迟到或重发时不能叠出第二条 rAF 链。 */
+    if (GATE){ GATE = false; if (!REDUCE && !raf) raf = requestAnimationFrame(frame); }
+  }
+  else if (d.what === "well-esc"){ onEsc(); }
+});
+
+/* 出口只在 iframe 里露出来 —— 单独打开样张时没东西可退。 */
+if (window.parent && window.parent !== window){
+  var exitEl = document.getElementById("exit");
+  exitEl.style.display = "inline-flex";
+  exitEl.addEventListener("click", function(){ wellSay("well-exit"); });
+}
+
+/* 双 rAF 再报到：等第一帧真画完。父页在黑幕落下的**同一刻**就填了 src，
+   早报会被当成"已经就绪"。 */
+requestAnimationFrame(function(){ requestAnimationFrame(function(){
+  wellSay("well-hello");
+}); });
+
+addEventListener("pagehide", function(){ cancelAnimationFrame(raf); });
+})();
+</script>
+</body>
+</html>

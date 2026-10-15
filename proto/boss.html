@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>深处战斗</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#07080d;color:#e8edf3;font-family:"Microsoft YaHei",system-ui,sans-serif}
+body{display:grid;place-items:center}canvas{display:block;width:100%;height:100%;image-rendering:auto}
+/* ── 层级（2026-10-11 修）───────────────────────────────────────────────
+   原来 #game 是 z-index:1，而 #hud/#hint/#touch/#result 全是 z-index:auto。
+   定位元素里 **1 比 auto 高一层**，于是那张不透明画布把 HUD、操作提示、触屏按钮和
+   结算浮层整个盖住 —— 不只是看不见，点击也被画布吃掉，输了以后「再试一次 / 离开」
+   两个按钮点不动。症状是"页面只有狗和 boss，没有血条、没有提示、没有结算框"。
+   ★ 判据别用 elementFromPoint：#hud 是 pointer-events:none，命中测试会跳过它，
+     永远返回画布，看着像"没被盖住"（假阴性）。真判据是出图，或比 computed z-index。
+   现在：#game 1 < #dogLayer 2（狗是 SVG，要压在画布上）< 各种 DOM 浮层 3 < 结算 4。 */
+#dogLayer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
+#game{position:fixed;inset:0;z-index:1}
+#hud{position:fixed;z-index:3;left:18px;top:16px;right:18px;display:flex;justify-content:space-between;gap:12px;pointer-events:none;font:12px ui-monospace,Consolas,monospace;color:#c8d5e4;text-shadow:0 2px 8px #000}
+#hint{position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);max-width:540px;padding:18px 22px;border:1px solid #586273;background:#0b0e15e8;text-align:center;line-height:1.7;transition:opacity .35s;pointer-events:none}
+#hint.hide{opacity:0}#touch{position:fixed;z-index:3;inset:auto 16px 16px;display:none;justify-content:space-between;pointer-events:none}
+#touch button{pointer-events:auto;width:54px;height:46px;border:1px solid #768297;background:#101621dd;color:#e8edf3;font-size:15px}
+/* ── 结算浮层（2026-10-12 重做。用户：「失败后的那个重来界面也要做一下」）──
+   原来是个通用深色盒子：输了以后画面**从红黑世界直接跳到一个灰蓝对话框**，
+   像点进了另一个网页，和这一场仗没有任何关系。
+   现在它属于这场战斗 —— 底色是 `paintWorld()` 那两支天空渐变的同色系
+   （红黑 / 深蓝淡蓝），边框跟着 `foe.phase` 走：死在第一阶段是红的、
+   死在第二阶段是蓝的，一眼能读出"我打到哪儿了"。
+   ★ 顶沿那道缝是故意的：它和战斗里"以斩击线为分界线"是同一根线。
+   ⚠ 宽度用 `width` + `border-box`，不是 `min-width` —— 后者在 400px 宽的
+     手机上会撑破视口（min-width 不含 padding，420+72=492 > 400）。 */
+#result{position:fixed;z-index:4;inset:0;display:none;place-items:center;text-align:center;
+  background:radial-gradient(circle at 50% 42%,#210d18f2 0,#0a050ae8 58%,#05060af7 100%)}
+#result.blue{background:radial-gradient(circle at 50% 42%,#0b2439f2 0,#05090fe8 58%,#04070bf7 100%)}
+#result.on{display:grid}
+#result .box{position:relative;box-sizing:border-box;width:min(86vw,420px);padding:32px 28px 26px;
+  border:1px solid #7a3c56;background:#120a12f0;box-shadow:0 24px 60px #000000b0}
+#result.blue .box{border-color:#3d6f9d;background:#070e17f0}
+#result .box::before{content:"";position:absolute;left:-28px;right:-28px;top:-1px;height:2px;
+  background:linear-gradient(90deg,transparent,#ff6078,transparent);box-shadow:0 0 20px #ff6078}
+#result.blue .box::before{background:linear-gradient(90deg,transparent,#9fe8ff,transparent);box-shadow:0 0 20px #9fe8ff}
+#result h2{margin:0;font:600 21px/1.4 ui-monospace,Consolas,monospace;letter-spacing:.16em;color:#ffd7e0}
+#result.blue h2{color:#d6f2ff}
+#result p{margin:11px 0 0;font-size:14px;line-height:1.7;color:#bda9b3}
+#result.blue p{color:#9fb4c6}
+#result .stat{margin-top:15px;font:12px ui-monospace,Consolas,monospace;letter-spacing:.1em;color:#8b7780}
+#result.blue .stat{color:#7f95a8}
+button{font:inherit;cursor:pointer}.actions{display:flex;justify-content:center;gap:10px;margin-top:18px}
+#result .actions button{padding:9px 20px;border:1px solid #b8778f;background:#2a1420;color:#ffe6ee;letter-spacing:.08em}
+#result .actions button:hover{background:#3d1c2c}
+#result.blue .actions button{border-color:#7fb3d8;background:#0f2133;color:#e6f5ff}
+#result.blue .actions button:hover{background:#153048}
+@media(max-width:700px){#touch{display:flex}#hint{width:min(78vw,460px)}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<svg id="dogLayer" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none"><g id="dogSprite"></g></svg>
+<div id="hud"><span id="hp">DOG 5 / 5</span><span id="bossHp">BOSS 12 / 12</span></div>
+<div id="hint">WASD 移动，W 跳跃（在空中再按一次是二段跳）。鼠标左键发射剑气，右键冲刺闪避。躲开地图炮预警。<br>地形板能站上去，Boss 也会跳上来抢高度。</div>
+<div id="touch"><span><button data-key="KeyA">←</button><button data-key="KeyD">→</button></span><span><button data-key="KeyW">跳</button><button data-action="dash">闪</button><button data-action="attack">剑</button></span></div>
+<div id="result"><div class="box"><h2 id="resultTitle">战斗结束</h2><p id="resultText"></p><p class="stat" id="resultStat"></p><div class="actions"><button id="retry">再试一次</button><button id="next">前进</button></div></div></div>
+<!-- 狗的画法。**生成物**，别手改 —— 由 `python scripts/sync-dog.py` 从 town.html 抽出。 -->
+<script src="dog-flat.js"></script>
+<script>
+"use strict";
+var REDUCE=matchMedia("(prefers-reduced-motion: reduce)").matches;
+var NS="http://www.w3.org/2000/svg";
+function svgEl(n,at){var e=document.createElementNS(NS,n);for(var k in at)e.setAttribute(k,at[k]);return e}
+var cv=document.getElementById("game"),ctx=cv.getContext("2d"),dogLayer=document.getElementById("dogLayer"),dogSprite=document.getElementById("dogSprite"),W=0,H=0,DPR=1,last=0,raf=0,t=0,state="fight",keys={},slashes=[],hazards=[],warn=0,shake=0;
+/* ── 2026-10-11 用户点名要的三样 ─────────────────────────────────────
+   「被击中要被击退啊，有个那种加速度什么的东西」 → KB（一次冲量 + 指数衰减）
+   「地形板现在可不可以站上去了呢，做下实体」     → 见 land(old)，old 传错了
+   「地图斩…以斩击线为分界线」那种切换世界颜色     → cut（刀扫到哪儿，色界到哪儿） */
+var KB={t:0,vx:0,K:7.5},cut={on:false,done:false,x:-1},sparks=[],hitStop=0;
+/* ⚠ 狗的画法来自 dog-flat.js —— 从 town.html 抽出来的**生成物**（scripts/sync-dog.py）。
+   镇上那只、镇上的头像、这里这只共用同一份几何；改了镇上的狗，重跑那个脚本。
+
+   原来这里挂着一个隐藏 iframe 去 town 里 `querySelector('[data-town-dog]')` 抓节点，
+   从来就没成功过：file:// 下**每个文件是各自独立的源**，跨文档读 DOM 被浏览器挡掉，
+   `contentDocument` 恒为 null（实测 frameDoc:false / frameQ:false）。而且是**静默**的 ——
+   catch 吞掉异常、`dogSprite` 里只剩一个空 <g>，画面和代码都看不出病，狗就是不出现。
+   跨文档只能走 postMessage，而 postMessage 传得动数据、传不动一个能每帧 pose 的活对象。
+   （还有一层：`dogFlat()` 返回的是 `{g, pose, place, …}` 对象，不是元素 —— 就算读得到
+     DOM，"把节点搬过来"这个形状本身也是错的，搬过来没有 pose。）
+
+   L 是狗的**局部长度**：几何在 0.951（鼻尖到尾尖）的坐标里写，×k（k=L/0.951）才成像素。
+   L=65 ⇒ 狗高约 62px、长 65px，对着 w/h=42 的碰撞盒。 */
+var DOG_L=65,dogVisual=null;
+if(window.DogFlat){dogVisual=DogFlat.make(DOG_L);dogSprite.replaceChildren(dogVisual.g)}
+var dog={x:180,y:0,vx:0,vy:0,w:42,h:42,hp:5,ground:false,face:1,attack:0,inv:0,dash:0,dashCd:0,run:0,
+         jumps:0};   /* 这次离地已经用掉几段跳（0/1/2）。落地清零，见 land() */
+/* ★ Boss 的锚点是自己的**中段**，脚下还在 +45（drawBoss 那个形状的最低点就是 y=45）。
+   玩家的 `dog.y` 本来就是脚下 —— 两者差这一个常量，落地判定才谈得上共用一份。
+   2026-10-12 之前 Boss 根本不落地：`foe.y = H-150 + sin(move*2.1)*12`，飘着晃。 */
+var FOE_FOOT=45;
+/* `vy/plat/ground` 是这次新给的"脚"；`target/think/press/jumpCd` 是策略状态；
+   `burst` 是剑气的三连发计数。`move`/`ai` 那两个只服务于旧的飘行与随机换位，删了。 */
+var foe={x:0,y:0,vy:0,w:116,h:108,hp:12,phase:0,cool:1.6,skill:6.5,burst:1,hit:0,
+         mode:"stalk",target:-1,think:0,press:0,pressT:0,jumpCd:0,plat:0,ground:true,face:-1,kx:0,
+         skip:-1,    /* 主动穿板下坠期间"这一帧别认这块板"，落地即清 */
+         hopT:0};    /* 这一趟赶路走了多久 —— 超过 6 秒就认输换牌（兜底，见 foeMove） */
+var skillN=0,slashN=0;   /* 只为探针：隔一段时间数一下，证明"技能没那么频繁了" */
+var platforms=[];
+/* ── 地形（2026-10-12 改。用户：「BOSS 战场地多点地形板」）──────────────
+   原来 5 块，而且是**一根斜梯**：H-220 / H-330 / H-245 / H-360 / H-165，
+   高度跳来跳去却没有分层，Boss 也够不着它们（它当时根本不会跳）。
+   现在 8 块、明确分三层，层高差 ~110px —— 这个数是**从跳跃力反推的**：
+   `vy=-700`、`g=1550` ⇒ 顶点 700²/(2·1550) ≈ 158px，所以层间留 110 有 48px 余量，
+   而"从地面直接够中层"（差 ~170）会差一点点 —— 那是故意的，逼着人踩低层往上走。
+     · 低层 H-170 / H-185 / H-170  ← 地面直接跳得上去
+     · 中层 H-280 / H-300 / H-280  ← 从低层上去
+     · 高层 H-390 / H-410          ← 从中层上去
+   宽度用 `pw()`：比例 × 视口，但**上下都夹住** —— 上限 190px 免得 2560 宽的屏上
+   一块板横跨半个屏幕；下限 64px 免得 400px 手机上一块板比狗还窄、站都站不住。
+   ⚠ 层与层之间 x 有重叠（比如高层 G 压在中层 D 上面）—— 这是有意的，堆叠台阶
+     才像地形。同层之间 x 不重叠，免得"我到底站在哪块板上"读不出来。 */
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);ctx.setTransform(DPR,0,0,DPR,0,0);dogLayer.setAttribute("viewBox","0 0 "+W+" "+H);
+ var pw=function(f){return Math.max(64,Math.min(f*W,190))};
+ platforms=[
+  {x:0,y:H-110,w:W,h:110},
+  {x:W*.06,y:H-170,w:pw(.13),h:18},{x:W*.40,y:H-185,w:pw(.13),h:18},{x:W*.74,y:H-170,w:pw(.13),h:18},
+  {x:W*.22,y:H-280,w:pw(.12),h:18},{x:W*.55,y:H-300,w:pw(.12),h:18},{x:W*.86,y:H-280,w:pw(.12),h:18},
+  {x:W*.10,y:H-390,w:pw(.11),h:18},{x:W*.60,y:H-410,w:pw(.11),h:18}];
+ foe.x=W-190;foe.plat=0;foe.vy=0;foe.ground=true;foe.y=(H-110)-FOE_FOOT;
+ foe.skip=-1;foe.think=0;foe.target=-1;foe.mode="stalk";foe.press=0;foe.pressT=0;foe.jumpCd=0;foe.hopT=0;
+ dog.y=H-110}addEventListener("resize",resize);resize();
+function say(x){parent!==window&&parent.postMessage({what:x},"*")}
+function down(k){keys[k]=true}function up(k){keys[k]=false}
+addEventListener("keydown",function(e){if(["KeyA","KeyD","KeyW","KeyS","Space","KeyZ","Escape"].indexOf(e.code)>=0)e.preventDefault();if(e.code==="Escape")leaveGame();down(e.code)});addEventListener("keyup",function(e){up(e.code)});
+addEventListener("contextmenu",function(e){e.preventDefault()});/* ★ 2026-10-12 用户：「闪避与攻击的键反了吧，我要左键攻击」——左右键对调。
+   右键照样被上面那行 contextmenu 挡着，所以拿它当闪避不会弹菜单。 */
+addEventListener("mousedown",function(e){if(e.button===0)attack();if(e.button===2)dash()});
+document.querySelectorAll("[data-key]").forEach(function(b){b.addEventListener("pointerdown",function(){down(b.dataset.key)});["pointerup","pointercancel","pointerleave"].forEach(function(e){b.addEventListener(e,function(){up(b.dataset.key)})})});
+document.querySelectorAll("[data-action]").forEach(function(b){b.addEventListener("pointerdown",function(){b.dataset.action==="dash"?dash():attack()})});
+function attack(){if(state!=="fight"||dog.attack>0)return;dog.attack=.28;slashes.push({x:dog.x+dog.face*34,y:dog.y-32,vx:dog.face*620,vy:0,life:.9,face:dog.face,r:13})}
+/* ★ 起跳 -650 → -700（1550 重力下顶点 136px → 158px）。
+   上一版的板有一块比顶点只低 1px —— 几何上根本站不上去。
+   "能不能站上去"这件事在**跳力**上就已经被卡死，光修 land() 只解决一半。
+   2026-10-12 的三层地形就是照这个 158 设计的：层间差 ~110px，留 48px 余量；
+   而"从地面直接够中层"（差 ~170）会差一点点 —— 故意的，逼着人踩着低层上去。 */
+/* ── 二段跳（用户 2026-10-12：「板子有点难上，加个跳跃力只有一半的二段跳吧」）
+   第一跳照旧 -700（顶点 158px，上面那三层地形就是照它设计的）。
+   第二跳**只有一半的力：-350**。注意力度减半 ≠ 高度减半 ——
+   高度是 (350/700)² = **四分之一**个第一跳，也就是再往上只有约 39px。
+   它买到的不是高度，是**空中那一次修正**：第一跳没对准板的边缘时还能在半空
+   改落点，而不是干看着自己落回地面。真要"再上一层楼"，得回到层高那三行去调。
+   `jumps` 是**每次离地**清一次的机会（落地清零，见 `land()`），不是全局两次 ——
+   所以踩空掉下去还能在落地前用掉第二段自救。
+   ⚠ `dog.jumps===0` 那一支是给"从板边走下去"的：那时 `ground` 已经是 false，
+   可这一跳在语义上仍是完整的第一跳，给半力就没道理。 */
+function jump(){
+  if(dog.ground||dog.jumps===0){dog.vy=-700;dog.ground=false;dog.jumps=1;return}
+  if(dog.jumps<2){dog.vy=-350;dog.jumps=2}
+}
+/* 冲刺是最好的脱离手段：它把 KB.t 清零 = 取消击退硬直。不给这条的话，
+   挨一下之后那 0.38 秒是"看着自己被推走"，连锁挨打没有翻盘手段。 */
+function dash(){if(state!=="fight"||dog.dash>0||dog.dashCd>0)return;dog.dash=.22;dog.dashCd=.65;dog.inv=.32;dog.vx=dog.face*920;KB.t=0;KB.vx=0}
+/* 打击感三件套：**顿帧 + 击退 + 火花**，缺一样打上去就像按了个开关。
+   顿帧（hitStop）在 frame() 里把 update 整个停住、画面照画 ——
+   看起来就是"世界卡了一下"，那一下就是力度。
+   `dir` 是**击退方向**（= 攻击来向的反面），不是攻击来向。 */
+function burst(x,y,dir,col){for(var i=0;i<12;i++)sparks.push({x:x,y:y,vx:dir*(90+Math.random()*520),vy:(Math.random()-.5)*520,life:.16+Math.random()*.24,col:col})}
+function hitDog(dir){if(dog.inv>0)return;dog.hp--;dog.inv=1.0;shake=.34;hitStop=.085;
+ /* ★ 击退 = 冲量 + **指数衰减**，不是每帧乘固定比例。
+    `v*=.88` 那种写法帧率一变击退距离就变（开发室那个死区坑同源）。
+    总位移 ≈ v/K = 620/7.5 ≈ 83px。 */
+ KB.t=.38;KB.vx=dir*620;if(dog.ground)dog.vy=-170;
+ burst(dog.x-dir*14,dog.y-30,dir,"#ffd9e2");if(dog.hp<=0)finish(false)}
+function hitBoss(dir){if(foe.hit>0)return;foe.hp--;foe.hit=.18;shake=.2;hitStop=.055;foe.kx=dir*520;
+ burst(foe.x-dir*34,foe.y-42,dir,"#dff8ff");if(foe.hp<=0)finish(true)}
+/* 结算：文案和配色都跟 `foe.phase` 走 —— "它换过色没有"是这局打到哪儿的唯一刻度。
+   2026-10-12 修了那颗死按钮（见下方 `goNext`），随之动了两处，都记在这儿：
+     · `#leave` → `#next`（文字也跟着状态走：赢「前进」/ 输「离开」）；
+     · 父页那头 `boss-won` **不再立刻放幕**了 —— 它改成停 `BOSS_HOLD` 再走，
+       给用户时间看完结算、也才点得到那颗「前进」。所以这条链现在的节奏是
+       "打赢 → 停一下 → 点前进（或等兜底）→ 幕 → 那 5 行字 → 联系页"。 */
+function finish(win){if(state!=="fight")return;state=win?"won":"lost";cancelAnimationFrame(raf);
+ var box=document.getElementById("result");
+ box.classList.add("on");box.classList.toggle("blue",foe.phase>0);
+ document.getElementById("resultTitle").textContent=win?"信号通道已清空":"声波被打断了";
+ document.getElementById("resultText").textContent=win?"前方的黑影碎开了。"
+   :(foe.phase>0?"世界翻了个面，它还是比你快。":"它还没换过色，你就被压住了。");
+ document.getElementById("resultStat").textContent=win?("自身剩余 "+dog.hp+" / 5"):("BOSS 剩余 "+foe.hp+" / 12");
+ document.getElementById("retry").style.display=win?"none":"inline-block";
+ /* ★ 赢和输，同一颗按钮说两句话：赢=「前进」（进字幕），输=「离开」（回镇上）。
+    原来两个字是写死在 HTML 里的「离开」，赢的时候也这么说，是错的。 */
+ document.getElementById("next").textContent=win?"前进":"离开";
+ say(win?"boss-won":"boss-lost")}
+/* ── 结算浮层那两颗按钮。★ 这里原来是 `onclick=leave` / `leave()`，而 `leave`
+   这个函数**全文件从来没定义过** —— 它被调了三处（Esc / 这颗按钮 / 父页的
+   `well-esc`），一处都没定义，却没炸。原因是 HTML 的**具名元素暴露**：
+   `<button id="leave">` 让 `window.leave` 自动变成了**那个按钮元素本身**，
+   于是 `onclick` 被赋了一个 DOM 元素（点击静默无效），`leave()` 抛 TypeError，
+   而控制台一句话都不报。2026-10-12 实测（`_logs/_bossleave.py`）：
+   `typeof window.leave === 'object'`、`onclick===<button>` 为真、
+   真鼠标点一下 state 和浮层**一个字节都没变**。
+   ⇒ 所以 id 换掉，**别再叫 `leave`**，否则下次还会被同一个机制吃掉。
+
+   ★ 两条路的出口是**分开的**，不能都发 `well-exit`：
+     输：发 `well-exit` → 父页 `sceneExit()` → 回镇上（这是原本的设计）。
+     赢：发 `boss-next` → 父页进字幕（那 5 行字 + 联系页）。
+     赢的时候**绝对不能**发 `well-exit`：父页那头 `SCENE.k` 这时是 "won"，
+     `well-exit` 会走进 `finishStory()` —— 整条故事线复位、直接回镇上，
+     那 5 行字和联系页用户就再也看不到了。 */
+function goNext(){ say(state==="won"?"boss-next":"well-exit") }
+/* Esc 和父页发来的 `well-esc` 都是"退出"，走这一条。 */
+function leaveGame(){ say("well-exit") }
+document.getElementById("retry").onclick=function(){location.reload()};
+document.getElementById("next").onclick=goNext;
+/* ★ 色调**不绑血量**，绑"它放没放过地图炮"（见 spawnSkill）。
+   原来这里是 `foe.hp<=4?2:foe.hp<=8?1:0`：要先把 Boss 打到 8 点、4 点才换色，
+   于是用户看到的是"发动好几次技能才转"—— 2026-10-11 实测报回来的。
+   现在只有两态（红黑 / 深蓝淡蓝），第一次放技能就转，转完不再回退。 */
+function overlap(a,b){return a.x+a.w>b.x&&a.x<b.x+b.w}
+/* ── 落地判定：2026-10-12 起玩家和 Boss **共用这一份** ──────────────────
+   `oldFeet`/`nowFeet` 都是**脚下**的 y。玩家的 `dog.y` 本来就是脚下的点；
+   Boss 的 `foe.y` 是身体锚点、脚下在 +FOE_FOOT，所以传进来之前先换算。
+   ★ `old` **必须由调用方传进来**（= 移动前的脚下高度）。
+   原来这里是 `var old=dog.y`，而 land() 是在 `dog.y+=dog.vy*dt` **之后**被调用的 ——
+   old 等于已经移动过的 y，判据 `old<=p.y && dog.y>=p.y` 退化成 `dog.y===p.y`，
+   浮点下几乎不可能命中 ⇒ **浮台一次都没接住过东西**，狗一路穿到地面
+   （地面是 `dest` 的初值兜底，所以只有地面有效）。这个 bug 不报错、不崩、
+   只是"站不上去"，和"没写这个功能"长得一模一样 —— 只能靠按键实测抓。
+   单向台：`vy>=0` 才判定，所以能从下面跳穿上来（三层板是叠着的，
+   做成双向实体的话，从下面那层起跳会顶到上面那层的**底面**，反而哪儿都上不去）。 */
+/* `skip` 是"这一帧先别认这块板"（Boss 主动穿板下坠时用，玩家不传 = 不跳）。
+   单向台没有它，站在板上的人永远下不来 —— 只会原地落回同一块。 */
+function landAt(x,halfW,oldFeet,nowFeet,vy,skip){
+ var dest=H-110,plat=0;
+ for(var i=1;i<platforms.length;i++){if(i===skip)continue;var p=platforms[i];if(vy>=0&&oldFeet<=p.y&&nowFeet>=p.y&&x+halfW>p.x&&x-halfW<p.x+p.w&&p.y<dest){dest=p.y;plat=i}}
+ return {y:dest,plat:plat,hit:nowFeet>=dest};
+}
+/* 玩家的包装：`dog.y` 就是脚下，所以直接传。返回"是不是落在浮台上"。 */
+/* ⚠ `dog.jumps=0` 和 `ground=true` 必须**成对**：它是"这次离地"的计数器，
+   落地不清零的话，下一次起跳会直接从半力那段开始（人会觉得"跳不起来了"）。 */
+function land(old){var r=landAt(dog.x,dog.w*.35,old,dog.y,dog.vy);dog.ground=false;if(r.hit){dog.y=r.y;dog.vy=0;dog.ground=true;dog.jumps=0}return r.plat>0}
+/* 脚下的世界高度。索引 0 就是地面那条线 —— `platTop(0)` 也是 `H-110`，
+   所以 `platCX(0)` 正好是 `W*.5`，下面那几处不用为"地面"写特例。 */
+function platTop(i){return i<=0?H-110:platforms[i].y}
+function platCX(i){return platforms[i].x+platforms[i].w*.5}
+function foeFeet(){return foe.y+FOE_FOOT}
+/* 玩家此刻站在第几号板上（-1 = 悬空）。只给探针用，判据和 `land()` 同一套。 */
+function dogPlat(){if(!dog.ground)return -1;for(var i=0;i<platforms.length;i++){var p=platforms[i];if(Math.abs(dog.y-p.y)<.6&&dog.x+dog.w*.35>p.x&&dog.x-dog.w*.35<p.x+p.w)return i}return -1}
+/* 玩家脚下**最近的那块板**（含地面）。人在空中时这个也有意义 —— 他总会落回某一块，
+   而 Boss 想"降到玩家那一层"就得先知道是哪一层。取的是"不高于他"的最高一块。 */
+function underPlat(x,y){var best=0;for(var i=1;i<platforms.length;i++){var p=platforms[i];if(x+18>p.x&&x-18<p.x+p.w&&p.y>=y-2&&p.y<platforms[best].y)best=i}return best}
+/* ── Boss 策略（2026-10-12 改）──────────────────────────────────────
+   用户那句「BOSS 也会跳上地形板，尽量与我们在不同的高度，优化下 BOSS 的策略」
+   落到实处就是：先给它脚，再给它**关于高度的意图**。
+
+   改之前它连脚都没有 —— `foe.y = H-150 + sin(move*2.1)*12`，永远在同一个高度
+   上下晃 12px，x 还被夹在 `[W*.55, W-70]` 的右半屏。玩家跳上任何一块板，
+   战斗就变成"它在下面冲着空气挥剑"。所以先换成 vy / ground / plat + landAt()。
+
+   `dh = foeFeet()-dog.y`：正 = 玩家在上面。三个状态都只用这一个量加横向距离来判：
+     press  压上来 —— 冷却好了、横向又在 430px 内：降到玩家那一层贴身打，限时 1.6s
+     hop    换高度 —— 高度差不到 70px（两个人齐平）时：挑一块**差得开的**板跳过去
+     stalk  拉开   —— 其余时候：待在自己这块板上，保持 330px 左右，边走边挥剑
+
+   ★ 高度差是**主动目标**，不是副作用：选板时按 |Δtop| 打分，还给"比玩家高一层"
+     的板额外加 90 分 —— 从上面压下来才有压迫感。这就是"尽量与我们在不同高度"。
+   ★ `press` 这一支**不能删**：没有它，Boss 会永远待在自己的板上，两个人隔着两层
+     台阶干瞪眼。压力来自它**偶尔下来**，不是一直同高 —— 所以它是限时的。
+   ★ 换板时不夹 x（`leave`），让它自己走出板沿掉下去 —— 下落本身就是换高度，
+     而且比"瞬移到另一块板上"可信得多。落回地面就重想，`think` 兜住别来回抽风。 */
+/* ★ 决策只在 `think` 归零时发生，而每次决策都会设一个新的 `think` ——
+   那是这个决策的**有效期**，不是"多久之后再想一次"。到期再进来，
+   "还在赶路"就只是把同一个决策续一段。第一版没分这两件事，于是
+   `hop` 每 2.6 秒重挑一次目标，Boss 在半路上不停改主意 ⇒ 实测 40 秒里
+   只落地过 2 次、剩下时间原地站着（`maxStall` 4.65 秒）。
+   ★ 第二版修好了"改主意"，却换成**另一种**卡死：它挑了一块**到不了**的板，
+     然后站在自己板沿上永远等下去 —— 实测 40 秒里静止 34 秒、`hop` 独占 36 秒，
+     三个场景的 `{'press':144,'hop':2159,'stalk':97}` 一个字节都不差（同一个死循环）。
+     两个根因：① 选板时没判"到不到得了"；② 单向台让它**下不来** ——
+     站在板上往下只会原地落回同一块。现在 `canHop()` 只发真到得了的牌，
+     `foe.skip` 给它一条"主动穿板下坠"的路。 */
+var AIR=140;   /* 空中横移预算。滞空 ≈1.26 秒 × 空中速度 150 ≈ 189px，取 140 留余量 */
+/* 从 a 号板去 b 号板，有没有可能？
+   —— 这不是精度问题：发了一张到不了的牌，Boss 会**站在那儿等一辈子**。
+   往上：顶点 310px 装得下高度差，且两块板的 x 空档跳得过去（`AIR`）。
+   往下：两块板的 x 必须**有重叠** —— 只有站在正上方才穿得下去；走到板沿再往下掉
+        是另一回事，落点全凭运气，不能算"到得了"。地面 `platforms[0]` 横跨全宽，
+        所以往下永远有保底选项，不会出现无路可走。 */
+function canHop(a,b){
+ if(a===b)return false;
+ var A=platforms[a],B=platforms[b],rise=platTop(a)-platTop(b);
+ if(rise>290)return false;
+ if(rise<-10)return B.x<A.x+A.w&&A.x<B.x+B.w;
+ return Math.max(0,Math.max(A.x-B.x-B.w,B.x-A.x-A.w))<=AIR;
+}
+function foeThink(){
+ var pPlat=underPlat(dog.x,dog.y);
+ /* ① 正在压：按表压满 pressT 再退，中途不重新决策。 */
+ if(foe.mode==="press"){
+  if(foe.pressT>0){foe.think=.6;return}
+  foe.mode="stalk";
+ }
+ /* ② 正在赶路：没到就续期；**到了就站一会儿** —— 那 1.6 秒的驻足才是
+    "它跳上去站住了"这个事实能被看见的地方，一路不停地跳反而读不出来。 */
+ if(foe.mode==="hop"){
+  if(foe.plat!==foe.target){foe.think=1.0;return}
+  foe.mode="stalk";foe.target=-1;foe.think=1.6;return
+ }
+ /* ③ 只有这里做新决策 */
+ if(foe.press<=0&&canHop(foe.plat,pPlat)){
+  foe.mode="press";foe.target=pPlat;foe.press=7.5;foe.pressT=3.0;foe.think=.6;return
+ }
+ var best=-1,bestScore=-1e9;
+ for(var i=0;i<platforms.length;i++){
+  if(!canHop(foe.plat,i))continue;   /* 到不了的板连打分都不该进 —— 见上面的注释 */
+  var top=platTop(i);
+  var score=Math.min(Math.abs(top-dog.y),240)-Math.abs(platCX(i)-foe.x)*.26;
+  if(top<dog.y-60)score+=90;         /* 比玩家高一层：这才是"不同的高度" */
+  if(score>bestScore){bestScore=score;best=i}
+ }
+ if(best>=0){foe.mode="hop";foe.target=best;foe.think=1.0;return}
+ foe.think=.9;
+}
+function foeMove(dt){
+ foe.think-=dt;foe.press=Math.max(0,foe.press-dt);foe.pressT=Math.max(0,foe.pressT-dt);
+ foe.jumpCd=Math.max(0,foe.jumpCd-dt);
+ if(foe.think<=0)foeThink();
+ /* 兜底：`canHop` 说得到、实际却到不了（版面改了、或者又冒出个没料到的边界），
+    那就把这张牌扔了重发。**没有这一条，任何一处判漏都是"永远站着不动"** ——
+    上面那个 1px 的洞就是这么被发现的，而它下次可能长在别处。 */
+ if(foe.mode==="hop"){foe.hopT+=dt;if(foe.hopT>6){foe.mode="stalk";foe.target=-1;foe.hopT=0;foe.think=.4}}
+ else foe.hopT=0;
+ foe.face=dog.x<foe.x?-1:1;
+ var ti=foe.target,tp=(ti>=0)?platforms[ti]:null;
+ /* 靶子是目标板上**离我最近的那一点**，不是中心 —— 中心可能在板那头，
+    而落点只要落在板上就算数；拿中心当靶子会把"够得着"误判成"够不着"。 */
+ var ax=tp?Math.max(tp.x,Math.min(foe.x,tp.x+tp.w)):0;
+ /* ★ 往**下**的目标站到它的**中心**，不是"最近的那一点"。最近的那一点就是两块的
+   **交界线**，而穿板下坠要求站在目标板正上方 —— 实测 Boss 正好停在那条线上
+   （x=274，目标板 1 是 [86,273]），而判据 `< tp.x+tp.w` 差 1 像素不成立，
+   于是它一个像素都不动地站了 27.9 秒。往上跳则相反：走最近的边才跳得过去。 */
+ var down=(tp&&platTop(ti)>foeFeet()+10);
+ /* 三档目标：**已经在玩家那块板上**才贴上去；否则先奔目标板。 */
+ var tx=(foe.mode==="press"&&foe.plat===ti)?dog.x+(foe.x<dog.x?-92:92)
+       :(tp?(down?platCX(ti):ax):dog.x+(foe.x<dog.x?-330:330));
+ /* ★ 站在板上时一律夹在**自己这块板**内。离开一块板只剩两条路：往上跳、往下穿 ——
+    第二版这里是"换板就放开 x，让它自己走出板沿掉下去"，结果它掉到哪块全凭运气，
+    心里认的还是原来那张牌 ⇒ 永远到不了。空中不夹，否则够不到侧面的板。 */
+ if(foe.ground){var bp=platforms[foe.plat];tx=Math.max(bp.x+10,Math.min(bp.x+bp.w-10,tx))}
+ /* 想上去就跳：**横向得先对得差不多**（<110px），不然会一头撞在板侧的空气上。
+   跳力按高度差现算（v=√(2gh)），所以它够得着就上去、够不着就老老实实走。 */
+ if(foe.ground&&tp&&foe.jumpCd<=0){
+  var top=platTop(ti);
+  if(top<foeFeet()-10){                /* 目标在上：对得够直就跳（跳力按 v=√(2gh) 现算） */
+   if(Math.abs(foe.x-ax)<=AIR){
+    foe.vy=-Math.min(980,Math.sqrt(2*1550*(foeFeet()-top+40)));
+    foe.ground=false;foe.jumpCd=.55;
+   }
+  }else if(top>foeFeet()+10){          /* 目标在下：站到它正上方，再**穿过脚下这块板** */
+   /* 判据必须跟 `landAt` 用同一套（带半个身位），不能拿身体中点比 ——
+      中点落在板沿外 1px 就判成"不在它上面"，而落下去其实接得住。 */
+   var hw=foe.w*.34;
+   if(foe.x+hw>tp.x&&foe.x-hw<tp.x+tp.w){
+    foe.vy=Math.max(foe.vy,60);foe.ground=false;foe.skip=foe.plat;foe.jumpCd=.5;
+   }
+  }
+ }
+ /* 冲上去比走快；空中 150 是这次调的 —— 原来 96 横移只有 121px，够不到侧面的板。 */
+ var spd=foe.mode==="press"?190:(foe.ground?140:150);
+ var d=tx-foe.x,stp=Math.min(Math.abs(d),spd*dt);
+ if(stp>.5)foe.x+=Math.sign(d)*stp;
+ var f0=foeFeet();
+ foe.vy+=1550*dt;foe.y+=foe.vy*dt;
+ var r=landAt(foe.x,foe.w*.34,f0,foeFeet(),foe.vy,foe.skip);
+ foe.ground=false;
+ if(r.hit){
+  foe.y=r.y-FOE_FOOT;foe.vy=0;foe.ground=true;foe.skip=-1;   /* 落地就撤销"别认这块板" */
+  if(r.plat!==foe.plat){foe.plat=r.plat;foe.think=Math.min(foe.think,.35)}   /* 换层了就重想 */
+ }
+ foe.kx*=Math.exp(-9*dt);
+ foe.x=Math.max(70,Math.min(W-70,foe.x+foe.kx*dt));
+}
+/* ★ 换色的**时机**仍在这儿（第一次放地图炮），但换的**方式**变了 —— 见 draw() 的 `seg`。
+   `foe.phase` 照旧在这一刻翻：Boss 自己、预警带、剑气都吃它，用户说
+   「当然 boss 的颜色还是这样吧」，那部分一个字没动。
+   改的是**世界**怎么换：现在由那一刀扫到哪儿决定 —— 刀线左边已是新世界、
+   右边还是旧的，刀扫完整屏才全变。`cut.done` 保证只有第一次那一刀改写世界，
+   后面几刀就只是"又划了一刀"（世界已经是新的了，再切没得切）。 */
+function spawnSkill(){skillN++;if(foe.phase===0)foe.phase=1;hazards.push({global:true,x:-W*.15,y:H*.46,w:W*1.3,h:22,life:1.12,delay:.42,progress:0,damageDone:false});warn=.72;shake=Math.max(shake,.28)}
+function update(dt){if(state!=="fight")return;t+=dt;dog.inv=Math.max(0,dog.inv-dt);dog.attack=Math.max(0,dog.attack-dt);dog.dash=Math.max(0,dog.dash-dt);dog.dashCd=Math.max(0,dog.dashCd-dt);foe.hit=Math.max(0,foe.hit-dt);shake=Math.max(0,shake-dt);
+ /* ★ 方向：A 向**左**、D 向**右**（`dir` 同时也是 `dog.face`，正 = 朝右，
+    和 `drawDog` 的 `scale(face<0?-k:k, -k)`、攻击点 `x+face*34` 同一套约定）。
+    2026-10-11 实测是反的：按住 A，`dog.x` 从 180 涨到 226 —— 往右走。
+    写法本身看着"对称所以不会错"，所以这个坑只能靠按键实测抓。 */
+ var dir=(keys.KeyD?1:0)-(keys.KeyA?1:0);
+ /* ★ 击退那 0.38 秒里玩家**失去控制**，速度整个由 KB 接管。
+    这条是"有没有打击感"的分水岭：挨了打还能立刻反向走开，读起来就只是掉了一格血。
+    顺带：转头也跟着冻结（挨打时还朝着新方向转身，等于没挨）。 */
+ if(KB.t>0){KB.t=Math.max(0,KB.t-dt);KB.vx*=Math.exp(-KB.K*dt);dog.vx=KB.vx}
+ else if(!dog.dash){dog.vx+=(dir*900-dog.vx*8)*dt;if(dir)dog.face=dir}
+ dog.x=Math.max(34,Math.min(W-34,dog.x+dog.vx*dt));
+ dog.run+=Math.abs(dog.vx)*dt*.035;if((keys.KeyW||keys.Space)){keys.KeyW=false;keys.Space=false;jump()}if(keys.KeyZ){keys.KeyZ=false;attack()}if(keys.KeyS&&dog.ground){dog.vx*=.8}
+ var y0=dog.y;dog.vy+=1550*dt;dog.y+=dog.vy*dt;land(y0);
+ if(dog.dash<=0&&KB.t<=0&&Math.abs(dog.vx)>500)dog.vx*=.88;   /* 别去阻尼击退，KB 自己会衰 */
+ for(var i=slashes.length-1;i>=0;i--){var q=slashes[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;q.r+=90*dt;if(q.life<=0||q.x<0||q.x>W||q.y<0||q.y>H){slashes.splice(i,1);continue}if(!q.enemy&&Math.abs(q.x-foe.x)<foe.w*.62&&Math.abs(q.y-(foe.y-42))<foe.h*.58){hitBoss(q.face);slashes.splice(i,1);continue}if(q.enemy&&Math.hypot(q.x-dog.x,q.y-(dog.y-30))<32){hitDog(q.vx<0?-1:1);slashes.splice(i,1)}}
+ /* ★ 地图炮的判定从"预警一结束就扣血"改成"**刀扫到身上才扣**"。
+    原来 `h.delay` 一归零就 `hitDog()`，跟狗站在哪儿没关系 —— 那不是刀，是全场掉血。
+    现在拿刀线的位置和狗比：刀扫过自己的**那一瞬间**才挨打，挨打的方向就是刀的走向
+    （所以是被**推着往刀走的方向**飞出去）。躲法也随之从"提前跑开"变成
+    "掐着时机用冲刺无敌帧**穿过去**"，和右键闪避这套输入对上了。 */
+ for(var j=hazards.length-1;j>=0;j--){var h=hazards[j];h.delay-=dt;if(h.delay<=0){h.life-=dt;if(h.global){h.progress=Math.min(1,h.progress+dt/.58);var lx=h.x+h.w*h.progress;if(!h.damageDone&&Math.abs(lx-dog.x)<26){if(dog.inv<=0)hitDog(1);h.damageDone=true}}}if(h.life<=0){hazards.splice(j,1)}}
+ /* ── Boss 出手（2026-10-12 改。用户：「技能太频繁了点」）──────────────
+    剑气：原来是**水龙头** —— 每 1.45 / 1.05 秒准时一发，一路泼到结束。
+    那种规律的背景噪音读起来不像"它在打你"，像环境。改成**三连发 + 长停顿**：
+    **两下** 0.34 秒的连斩，然后停 3.4 / 2.8 秒 —— 30 秒里 20 发降到 16 发
+    （第二阶段 29 → 19）。次数掉下来，威胁感反而上去。
+    方向也从"恒定朝左"改成**朝玩家**（Boss 现在满场跑了，朝左就没意义了）。
+    地图炮：间隔 4.4 / 2.8 → **9.0 / 6.0**，而且**只在自己踩在地上时放** ——
+    空中放的话预警带和它的位置对不上，玩家也没法从"它在哪"读出威胁该往哪躲。 */
+ foeMove(dt);foe.cool-=dt;foe.skill-=dt;
+ if(foe.cool<=0){
+  var mx=foe.x+foe.face*54,my=foe.y-48,ax=dog.x-mx,ay=(dog.y-30)-my,L=Math.hypot(ax,ay)||1,SP=470;
+  slashes.push({x:mx,y:my,vx:ax/L*SP,vy:ay/L*SP,life:1.7,face:foe.face,r:10,enemy:true});slashN++;
+  if(foe.burst>0){foe.burst--;foe.cool=.34}else{foe.burst=1;foe.cool=foe.phase?2.8:3.4}
+ }
+ if(foe.skill<=0&&foe.ground){foe.skill=foe.phase?6.0:9.0;spawnSkill()}
+ for(var si=sparks.length-1;si>=0;si--){var s=sparks[si];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=900*dt;s.life-=dt;if(s.life<=0)sparks.splice(si,1)}
+ /* ★ 色界跟着刀走：`cut.on` 期间 draw() 拿 `cut.x` 当分界线。
+    第一刀扫完（global hazard 消失）就 `done`，世界从此定在新色上，后面几刀不再切色。
+    ⚠ 顺序上 `spawnSkill()` 就写在这一段**前面**（同一个 update 里），所以 `cut.on`
+    和 `foe.phase` 是同一帧起来的、`cut.x` 还是 -0.15W ⇒ draw() 走 `seg<=0` 那一支
+    画全旧色。要是把 spawnSkill 挪到这段后面，"phase 先翻、cut 后到"中间就会漏出
+    一帧整屏换色 —— 那正是这次要改掉的东西。 */
+ var gz=null;for(var gi=0;gi<hazards.length;gi++)if(hazards[gi].global)gz=hazards[gi];
+ if(gz){cut.x=gz.x+gz.w*gz.progress;if(!cut.done)cut.on=true}
+ else if(cut.on){cut.on=false;cut.done=true}
+ warn=Math.max(0,warn-dt);document.getElementById("hp").textContent="DOG "+dog.hp+" / 5";document.getElementById("bossHp").textContent="BOSS "+foe.hp+" / 12"}
+/* 一个色调下的整个世界：天空渐变 + 底台 + 浮台。
+   抽成函数是为了**画两遍**（见 draw 的 seg）—— 不是特效，是分界线两边各画一次。 */
+function paintWorld(blue){
+ /* 天空仍是渐变（它给的是纵深），**地面和平台一律实心**。
+    2026-10-11 用户：「地形板和地面用实心，这样颜色更突出」。
+    原来平台是"很暗的填充 + 一圈细亮边"，远看只剩几条线，和底色几乎分不开。
+    ⚠ 底台和浮台必须**分两个色**：同色的话，跳上去那一刻读不出"我站在一块板上"。 */
+ var g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,blue?"#071c39":"#180b16");g.addColorStop(1,blue?"#0d2740":"#0d060c");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle=blue?"#17456b":"#4a1c33";ctx.fillRect(platforms[0].x,platforms[0].y,platforms[0].w,platforms[0].h);
+ ctx.fillStyle=blue?"#2f7fb8":"#8e2f57";for(var pi=1;pi<platforms.length;pi++){var pf=platforms[pi];ctx.fillRect(pf.x,pf.y,pf.w,pf.h)}
+}
+function draw(){var p=foe.phase;ctx.clearRect(0,0,W,H);
+ /* ★ 斩击即分界（用户：「没有那种斩击切换世界颜色的效果…要以斩击线为分界线」）。
+    `seg` 就是刀线此刻的屏幕 x：左边画新色、右边画旧色，一个 `clip` 各画一趟。
+    刀从 -0.15W 扫到 1.15W，所以"新世界"是**跟着刀一路追上来**的，
+    而不是原来那种"按一下，整屏换个色"—— 那一版读起来没有力度。
+    `cut.on` 只在第一刀为真（见 update 末尾），之后世界已是新的，再切没得切。 */
+ var seg=cut.on?cut.x:(foe.phase?W:0);
+ if(!cut.on)paintWorld(foe.phase>0);
+ else if(seg<=0)paintWorld(false);
+ else if(seg>=W)paintWorld(true);
+ else{ctx.save();ctx.beginPath();ctx.rect(0,0,seg,H);ctx.clip();paintWorld(true);ctx.restore();
+      ctx.save();ctx.beginPath();ctx.rect(seg,0,W-seg,H);ctx.clip();paintWorld(false);ctx.restore()}
+ /* 那道缝本身：一条硬白线 + 外扩辉光，正好压在两种颜色的交界上。 */
+ if(cut.on&&seg>0&&seg<W){ctx.save();ctx.globalAlpha=.85;ctx.fillStyle="#f2fdff";ctx.fillRect(seg-1.5,0,3,H);ctx.globalAlpha=.16;ctx.fillRect(seg-12,0,24,H);ctx.restore()}
+ var sx=shake?Math.sin(t*90)*5:0;ctx.save();ctx.translate(sx,0);if(warn>0){ctx.fillStyle=p?"#82dcff":"#ef4d68";ctx.globalAlpha=.32;ctx.fillRect(0,H-112,W,4);ctx.globalAlpha=1}hazards.forEach(drawHazard);slashes.forEach(drawSlash);sparks.forEach(drawSpark);drawDog();drawBoss();ctx.restore()}
+/* `place` 锚的是**地面上的点**（和 town 里 `placeDog()` 传 `P(p.x,p.y,0)` 同一套），
+   `pose.ph` 要的是**圈数**（内部 ×2π），所以 `dog.run` 那个累加值直接给。
+   落地才走步态；冲刺时腿收住（`gait:false`）。 */
+function drawDog(){if(!dogVisual)return;if(dog.inv>0&&Math.floor(t*22)%2)return;dogVisual.place(dog.x,dog.y,dog.face);dogVisual.pose({ph:dog.run,gait:dog.ground&&!dog.dash});}
+function drawBoss(){var x=foe.x,y=foe.y,blue=foe.phase>0;ctx.save();ctx.translate(x,y);ctx.fillStyle=foe.hit>0?"#fff":(blue?"#315b86":"#712d52");ctx.beginPath();ctx.moveTo(-58,45);ctx.lineTo(-50,-55);ctx.lineTo(0,-94);ctx.lineTo(58,-55);ctx.lineTo(64,45);ctx.closePath();ctx.fill();ctx.fillStyle=blue?"#b8e8ff":"#f2c1ce";ctx.fillRect(-32,-35,18,7);ctx.fillRect(14,-35,18,7);ctx.restore()}
+function drawHazard(h){if(h.global){ctx.save();ctx.globalAlpha=h.delay>0?.28:.95;ctx.fillStyle=foe.phase?"#b8f2ff":"#ff526c";var x=h.x+h.w*h.progress;ctx.fillRect(x-22,0,44,H);ctx.globalAlpha=.34;ctx.fillRect(x-40,0,80,H);ctx.restore();return}ctx.save();ctx.translate(h.x,h.y);ctx.rotate(h.ang);ctx.globalAlpha=h.delay>0?.35:.9;ctx.strokeStyle=foe.phase?"#a7edff":"#ff526c";ctx.lineWidth=h.delay>0?3:8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(h.w,0);ctx.stroke();ctx.restore()}
+function drawSlash(q){ctx.save();ctx.translate(q.x,q.y);ctx.rotate(Math.atan2(q.vy,q.vx));ctx.strokeStyle=q.enemy?(foe.phase?"#9fe8ff":"#ff6078"):"#dff8ff";ctx.lineWidth=q.enemy?7:5;ctx.globalAlpha=Math.max(0,Math.min(1,q.life));ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(30,0);ctx.stroke();ctx.restore()}
+/* 火花画成一小段拖尾（用自身速度反推尾巴），比圆点更像"被打飞出来的碎屑"。 */
+function drawSpark(s){ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,s.life*4));ctx.strokeStyle=s.col;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-s.vx*.022,s.y-s.vy*.022);ctx.stroke();ctx.restore()}
+/* ★ 顿帧：只停 `update`（逻辑），**不停 `draw` 也不停排帧**。
+   所以画面还在刷、只是世界冻住 —— 这就是"打上去那一下"的力度来源。
+   停的是逻辑也意味着击退和火花会**定格在命中那一刻**再飞出去，不是边打边滑。
+   ⚠ dt 仍要照常吞掉（`last=now` 在上面），否则顿帧一结束会补一个巨大的 dt。 */
+function frame(now){var dt=last?Math.min(.033,(now-last)/1000):0;last=now;
+ if(hitStop>0){hitStop=Math.max(0,hitStop-dt);draw();if(state==="fight")raf=requestAnimationFrame(frame);return}
+ update(dt);draw();if(state==="fight")raf=requestAnimationFrame(frame)}
+/* 开场那块说明只在头几秒有用。它是 `position:fixed` 钉在 50%/50% 的，
+   也就是**正好压在场地正中**，一直挂着等于拿一块半透明板盖掉半个战斗区。
+   CSS 里 `#hint.hide{opacity:0}` 早就写好了，可全文件**没有任何一处去加这个 class** ——
+   于是它永远不消失。2026-10-12 出图时才看见（Boss 站在场上而那块板横在中间）。
+   重试走的是 `location.reload()`，所以定时器不必清、重开一局自然重新计时。 */
+setTimeout(function(){document.getElementById("hint").classList.add("hide")},4600);
+window.addEventListener("message",function(e){if(e.data&&e.data.what==="well-esc")leaveGame()});requestAnimationFrame(frame);requestAnimationFrame(function(){requestAnimationFrame(function(){say("well-hello")})});
+/* ⚠ 这里**不能**再放 `get dash(){return dog.dash}` —— 对象字面量最后一行有
+   `dash:dash`（导出那个函数），同名属性后者胜，那个 getter 从来就没生效过，
+   读 `__bossProbe.dash` 拿到的是函数。2026-10-12 验键位时撞上：`JSON.stringify`
+   对函数值会把整个键丢掉，症状是"快照里少了一个字段"，不报错。
+   要读闪避状态走下面的 `dogState.dash`。 */
+window.__bossProbe={get state(){return state},get hp(){return dog.hp},get bossHp(){return foe.hp},get phase(){return foe.phase},get platforms(){return platforms.map(function(p){return{x:p.x,y:p.y,w:p.w,h:p.h}})},
+ /* ── 下面这几个是 2026-10-11 那三样改动**唯一能验的出口** ──
+    `footing.plat` 是"狗此刻站在第几号板上"，-1 = 没站在任何浮台上。
+    判"地形板是不是实体"**只能看这个**：看画面会把"穿过去了"读成"跳得高"。
+    `kb` 是击退状态；`cut` 看刀线走到哪儿；`sparks` 只是给个非零证据。 */
+ get footing(){return{y:+dog.y.toFixed(1),ground:dog.ground,plat:dogPlat(),vy:+dog.vy.toFixed(1)}},
+ /* ── 玩家状态的出口（2026-10-12 加，验鼠标键位用）──
+    `attack`/`dash` 是**两个各自只有一个来源**的计时器：只有 `attack()` 会设
+    `.28`、只有 `dash()` 会设 `.22`。所以"按一下之后哪个不为 0"就一对一地
+    说明了按的是哪个键 —— 比看画面或者数剑气都硬。
+    `x` 是位移：冲刺会让狗以 920 px/s 冲出去（0.1 秒约 90px），攻击不动。 */
+ get dogState(){return{x:+dog.x.toFixed(1),y:+dog.y.toFixed(1),face:dog.face,
+   attack:+dog.attack.toFixed(3),dash:+dog.dash.toFixed(3),dashCd:+dog.dashCd.toFixed(2),
+   inv:+dog.inv.toFixed(2),ground:dog.ground,jumps:dog.jumps,vy:+dog.vy.toFixed(1)}},
+ /* ── 2026-10-12 那三样（地形板 / Boss 跳板与高度差 / 技能频率）的出口 ──
+    `bossFooting.plat` 是"Boss 此刻踩在第几号板上"（-1 表示还没落过地）。
+    判「Boss 会不会跳上地形板」**只能看这个** —— 看画面会把"它飘在那儿"
+    读成"它站在板上"，因为两者的屏幕位置可以重合。
+    `dh` = Boss 脚下比玩家脚下低多少，正 = 玩家在上面。用户要的是这个数**别老是 0**。
+    `shots` 里 `skills` 是地图炮累计次数：跑固定时长读一次，就能算出间隔变没变长。 */
+ get bossFooting(){return{x:+foe.x.toFixed(1),y:+foe.y.toFixed(1),feet:+foeFeet().toFixed(1),
+   plat:foe.plat,ground:foe.ground,vy:+foe.vy.toFixed(1),face:foe.face,
+   dh:+(foeFeet()-dog.y).toFixed(1),mode:foe.mode,target:foe.target}},
+ get bossPlan(){return{think:+foe.think.toFixed(2),press:+foe.press.toFixed(2),
+   cool:+foe.cool.toFixed(2),skillT:+foe.skill.toFixed(2),burst:foe.burst}},
+ get shots(){return{slashes:slashN,skills:skillN,hazards:hazards.length,live:slashes.length}},
+ setFoe:function(x,y){foe.x=x;foe.y=y;foe.vy=0;foe.ground=false},
+ think:foeThink,
+ get kb(){return{t:+KB.t.toFixed(3),vx:+KB.vx.toFixed(1)}},
+ get cut(){return{on:cut.on,done:cut.done,x:+cut.x.toFixed(1)}},
+ get sparks(){return sparks.length},
+ get hitStop(){return +hitStop.toFixed(3)},
+ setPos:function(x,y){dog.x=x;dog.y=y;dog.vx=0;dog.vy=0;dog.ground=false;dog.jumps=0},
+ press:function(k,v){keys[k]=!!v},
+ attack:attack,dash:dash,hitBoss:hitBoss,hitDog:function(d){hitDog(d||1)},reset:function(){location.reload()}};
+</script>
+</body>
+</html>
