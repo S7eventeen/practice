@@ -24,11 +24,11 @@
        opacity:0;transition:opacity .45s;white-space:nowrap}
   #hud.on{opacity:1}
 
-  /* 读数盒子**默认不显示**，`?probe` 或 `?dbg=1` 才开 —— 和镇子里那三个样张页
-     同一条约定（见 town.html / fx-throw.html / fx-wall.html / slash-test.html）。
-     ★ 藏起来不影响探针：`display:none` 的元素 `textContent` 照常读得到。
+  /* 读数盒子默认不显示，`?probe` 或 `?dbg=1` 才开 —— 和镇子里那三个样张页同一条
+     约定（见 town.html / fx-throw.html / fx-wall.html / slash-test.html）。
+     藏起来不影响探针：`display:none` 的元素 `textContent` 照常读得到。
      原来它默认可见（CSS 里压根没写 display），而 `:501` 那句
-     `dbg.style.display=''` 是个**空操作** —— 看着像"在控制显示"，其实没有。 */
+     `dbg.style.display=''` 是个空操作 —— 看着像"在控制显示"，其实没有。 */
   #dbg{position:fixed;left:12px;bottom:12px;z-index:9;color:#5f8f86;font-size:11px;
        line-height:1.6;white-space:pre;background:rgba(6,10,14,.7);
        border:1px solid #17302e;border-radius:4px;padding:7px 10px;pointer-events:none;
@@ -49,33 +49,18 @@
   /* ── 机身各面 ───────────────────────────────────────────────── */
   .face{box-sizing:border-box;position:absolute;left:0;top:0}
 
-  /* ★ 2026-10-09：机身这一整棵（`.face` 六个面 + `.bezel` 凹槽 + `.well` 灰框）都只是
-     **外壳**，本来就不该接收指针事件。用户报「放大后点不进屏幕」，台账把病灶缩到了
-     hit-test 那一层：
-
-       .scr 的矩形罩住全部五个探测点   ✅（布局没问题）
-       elementsFromPoint 的 13 层里有它 ✅
-       elementFromPoint 8/8 全落在 .bezel ❌  ← 连 .scr 自己的矩形中心都命不中它
-
-     而 `.bezel` 是 `.screen` 的**祖先** —— 祖先在几何上盖不住后代。⇒ hit-test 在
-     `.screen` 那一层就停住了。`.screen` 恰好有两个 hit-test 会特殊对待、而几何遍历
-     不管的属性：`overflow:hidden` 与 `border-radius`；`.bezel` 两个都没有。
-     把外壳全部让开，hit-test 的候选就只剩 `.screen`。
-     ★ 本机（dpr 1/2、四种视口）一次都没复现出来，所以这属于**按证据推的修法**；
-       但它把候选从 4 个减到 1 个，无论真因是哪一支都只会更准，不会更差。
-     ★ `.screen` 必须**显式**接回来：`pointer-events` 是继承属性，祖先设了 none，
-       后代不写 auto 就一起失灵。 */
+  /* 机身 face/bezel/well 不接收指针事件，避免 CSS3D 外壳截获屏幕点击。
+       pointer-events 会继承，因此 .screen 必须显式设为 auto。 */
   .bezel,.well,.face{pointer-events:none}
   .screen{pointer-events:auto}
 
-  /* 正面：Macintosh Classic。上部是宽边框包着的**凹陷**屏幕，中部一大片米白
-     印 logo，底部一块**前凸台阶** —— 台阶用子元素的 translateZ 往前推 30px，
-     所以 .front 必须 preserve-3d，否则子元素的 3D 变换会被压平（不报错，
-     只是台阶贴回面板上，看起来"没做"）。 */
-  /* 色调**直接抄原片实测**，不要按比例放大：额头 (196,184,164)、屏下机身 (175,169,155)、
-     台阶 (170,164,154)、左边框 (193,179,153)。
-     之前那版是拿原片值乘 1.23 得来的（#f4f0e0 系），整体亮了 25% —— 原片的机身本来
-     就是这种中等亮度的暖褐，不是米白。 */
+  /* 正面：Macintosh Classic。上部是宽边框包着的凹陷屏幕，中部一大片米白印 logo，
+     底部一块前凸台阶 —— 台阶用子元素的 translateZ 往前推 30px，所以 .front 必须
+     preserve-3d，否则子元素的 3D 变换会被压平（不报错，只是台阶贴回面板上，
+     看起来"没做"）。 */
+  /* 色调直接抄原片，不要按比例放大：额头 (196,184,164)、屏下机身 (175,169,155)、
+     台阶 (170,164,154)、左边框 (193,179,153)。之前那版是拿原片值乘 1.23 得来的
+     （#f4f0e0 系），整体亮了 25% —— 原片的机身本来就是这种中等亮度的暖褐，不是米白。 */
   .front{transform-style:preserve-3d;
     background:linear-gradient(172deg,#c9bcab 0%,#c4b7a6 32%,#b3ad9f 72%,#aaa49a 100%);
     border-radius:15px;
@@ -86,15 +71,9 @@
   .front::before{left:17px}
   .front::after{right:17px}
 
-  /* 屏幕凹坑。原片实测：坑从 9.6% 到 61.6% 机身高，而且**上内壁最厚（≈25px）
-     最暗、下内壁最薄最亮**（光从左上来）——四边做成一样厚就不像了。
-     所以 padding 与 inset 阴影都做成不对称的。 */
-  /* 尺寸照 10% 网格量：凹坑左右各 6% 机宽（不是 11%）、上下 8%~53% 机身高（不是
-     10%~63%）—— 原来那版屏幕又窄又高，玻璃区高宽比比原片横得多。 */
-  /* 尺寸与内壁颜色全是三条剖面量出来的（原片凹坑 8.5%~57%、左右各 8.5% 机宽）：
-       上内壁 (122,112,103) **暗**  左内壁 (200,200,196) **亮**且中性灰
-       下内壁 (205,197,177) **亮**  右内壁 同左
-     ⇒ **只有上边暗**，不是对角渐变（我按缩略图判成"左上暗"是错的，量了才知道）。 */
+  /* 屏幕凹槽采用不对称 padding 和 inset 阴影，保持上壁较厚较暗、下壁较薄较亮。 */
+  /* 屏幕尺寸按下方最终测量规则设置。 */
+  /* 凹槽范围约为机身高 8.5%~57%、左右各 8.5%；上内壁暗，左右与下壁亮。 */
   .bezel{position:absolute;left:32px;right:32px;top:44px}
   .well{position:relative;box-sizing:border-box;height:252px;border-radius:8px;
     padding:23px 19px 18px 19px;
@@ -104,7 +83,7 @@
                inset -5px 0 8px -3px rgba(0,0,0,.16),
                inset 0 -4px 8px rgba(255,255,255,.4),
                0 1px 0 rgba(255,255,255,.35)}
-  /* 屏幕玻璃外沿还有一圈很细的**白**反光（原片上边缘那条亮线） */
+  /* 屏幕玻璃外沿还有一圈很细的白反光（原片上边缘那条亮线） */
   .screen{position:relative;box-sizing:border-box;width:100%;height:100%;
     border-radius:3px;overflow:hidden;background:#0b1016;
     /* 内阴影别下重了：24px/.92 那版在左右两侧压出两条很宽的暗带，
@@ -115,25 +94,25 @@
     background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px),
                linear-gradient(122deg,rgba(255,255,255,.09) 0%,transparent 40%)}
 
-  /* 软驱槽 —— 原片里它**偏右**，不是居中的通长槽 */
-  /* 软驱槽。原片实测在 76.4% 机身高，而且**贴右边缘一路伸出去**（被机身右边切掉），
+  /* 软驱槽 —— 原片里它偏右，不是居中的通长槽 */
+  /* 软驱槽。原片在 76.4% 机身高，而且贴右边缘一路伸出去（被机身右边切掉），
      不是居中的小槽 —— 行剖面在 y=360 抓到 146 个暗像素、左右两侧都是 0。 */
   .slot{position:absolute;left:52%;right:0;top:75.5%;height:11px;
     border-radius:2px 0 0 2px;
     background:linear-gradient(180deg,#585245,#151310 60%,#2b2721);
     box-shadow:0 1px 0 rgba(255,255,255,.5), inset 0 2px 3px rgba(0,0,0,.8)}
 
- /* 苹果标 + 机型名。原片在 86% 机身高，而台阶占 79%~100% —— 所以它是印在**台阶的
-     前立面**上的，靠左：苹果标 6.8%~12.8% 机宽，名字 15.5% 起。
-     ⇒ 它必须是 .lip 的**子元素**。挂在 .front 上会被 translateZ(30px) 的台阶整个
-     盖住，一个字都看不见（而且不报错，只是"没做"）。 */
+ /* 苹果标 + 机型名。原片在 86% 机身高，而台阶占 79%~100% —— 所以它是印在台阶的
+    前立面上的，靠左：苹果标 6.8%~12.8% 机宽，名字 15.5% 起。
+    ⇒ 它必须是 .lip 的子元素。挂在 .front 上会被 translateZ(30px) 的台阶整个盖住，
+    一个字都看不见（而且不报错，只是"没做"）。 */
   .brand{position:absolute;left:5%;top:31%;display:flex;align-items:center;gap:12px;
     color:#6a6252;font-size:11.5px;letter-spacing:.05em}
   .brand svg{width:15px;height:18px;flex:none;display:block}
 
-  /* 底部前凸台阶。原片里它比机身**略窄**，而且**和机身几乎同色**（采样：台阶
-     (170,164,154) vs 屏下 (177,168,153)，差 7）—— 我原来做亮了，看起来像贴上去
-     的另一块板。区分靠的是上边缘一条暗线 + 往机身上下沿投的一条影。 */
+  /* 底部前凸台阶。原片里它比机身略窄，而且和机身几乎同色（采样：台阶 (170,164,154)
+     vs 屏下 (177,168,153)，差 7）—— 做亮了看起来像贴上去的另一块板。
+     区分靠的是上边缘一条暗线 + 往机身上下沿投的一条影。 */
   .lip{position:absolute;left:7px;right:7px;bottom:-3px;height:109px;
     transform:translateZ(30px);
     background:linear-gradient(180deg,#b6b0a3,#ada79a 55%,#a29c90);
@@ -146,7 +125,7 @@
     background:linear-gradient(180deg,#b8af9b,#a89f8c);
     transform-origin:50% 100%;transform:translateZ(30px) rotateX(90deg)}
 
-  /* 背面：光面 + 右侧一条竖凸筋 + 左下角一小块**横向**散热槽。
+  /* 背面：光面 + 右侧一条竖凸筋 + 左下角一小块横向散热槽。
      （原片不是满铺竖格栅 —— 那是缩略图上会读反的一处。）
      凸筋的白要压到很淡：原来 .55 看着像贴了条白胶带，原片只是一道很浅的鼓包。 */
   .back{background:linear-gradient(158deg,#c6baa9,#aca497);border-radius:13px;
@@ -161,26 +140,8 @@
   .side{background:linear-gradient(180deg,#b0a898,#8e8779);border-radius:6px}
   .top{background:linear-gradient(90deg,#c4b8a6,#a9a094);border-radius:6px}
 
-  /* ── 屏幕里：一台电脑的桌面 ───────────────────────────────────────
-     2026-10-07 用户推翻了上一版（照原片做的"经典 Mac 文档窗口"）：
-       "屏幕的页面设计的有些怪，有些无意义的纹路，改掉吧，比如上面的刻度。
-        事实上就是个电脑屏幕，里面有桌面，就用经典的草地吧，还有几个 txt，
-        只不过默认打开了一个。"
-     ⇒ 草地壁纸 + 桌面几个 .txt 图标 + 一个开着的窗口 + 底部任务栏。
-     删掉的：标尺（点名的"刻度"）、菜单栏那三个黑方块、省略号那行、
-     屏幕右缘那条滚动条、左下角"12 pt"小方框 —— 都是信息量为零的纹路。
-     ★ 字号仍然故意做小（正文 6.5px）：远看就是原片那种"一屏密集小字"的观感；
-       点开、相机推近之后由 CSS3D 重新栅格化才读得清。字号调大立刻不像。
-     ★ 2026-10-08 **更正**：这里原来写着「窗口上那三个按钮是画出来的，不是能点的：
-       这层 DOM 埋在 CSS3D 面板里，相机推进后指针要走 canvas 才到得了它」。
-       **那句话是错的**，已删。实测（`_logs/_deskhit.py`，真鼠标打在 `?go=1` 上）：
-       `elementFromPoint` 拿到的就是那个 `<b>`，真 pointerdown / click 也照常到达。
-       错在哪：`renderer` 是 `THREE.CSS3DRenderer`，它的 `domElement` 是个 **div**，
-       不是盖在上面的 canvas；CSS3D 挂的是**真 DOM**，浏览器对 CSS transform 的
-       hit-test 是认的 —— `.wtx` 一直"真能滚"（见下面那条注释）就是同一个证据，
-       当时没把两件事连起来。
-       ⇒ 所以窗口是真能点的，一套小窗口管理（开 / 拖 / 最小化 / 最大化 / 关）
-         就挂在这层 DOM 上。真交互不止机身那一层了。 */
+  /* CSS3D 屏幕使用真实 DOM，提供草地桌面、txt 图标、窗口和任务栏。
+       正文保持 6.5px，推近后由浏览器重新栅格化。窗口支持开关、拖动、最小化与最大化。 */
   .scr{position:relative;width:100%;height:100%;overflow:hidden;
     background:#2f6fb5;color:#111;
     font:6.5px/1.45 Tahoma,Verdana,"Microsoft YaHei",sans-serif}
@@ -193,9 +154,9 @@
                #b2d878 0%,#84bb4a 34%,#57992e 68%,#3f7d22 100%)}
   .xp .cl{position:absolute;border-radius:50%;background:#fff;opacity:.9}
   /* 桌面图标：几个 txt（白纸 + 蓝标题条 + 几行灰字）。
-     `cursor:pointer` 在这里不只是装饰：这层 DOM 真的收得到指针（见 .scr 上面
-     那条更正的注释），指针变成手就是"它可点"的唯一提示 —— 屏幕里所有东西
-     都小，没有光标提示用户根本不会去试。 */
+     `cursor:pointer` 在这里不只是装饰：这层 DOM 真的收得到指针（见 .scr 上面那条
+     更正的注释），指针变成手就是"它可点"的唯一提示 —— 屏幕里所有东西都小，
+     没有光标提示根本不会去试。 */
   .ic{position:absolute;width:38px;text-align:center;color:#fff;
     font-size:5px;line-height:1.3;cursor:pointer;
     text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.55)}
@@ -206,15 +167,8 @@
     background:#3f7ac0}
   .ic .pg::after{content:"";position:absolute;left:2px;right:2px;top:6px;bottom:2px;
     background:repeating-linear-gradient(180deg,#aeb9c4 0 1px,transparent 1px 3px)}
-  /* 联系方式那一个：**纯绿一块**（2026-10-12 用户："图标改为全绿"）。
-     上一版是微信图标（绿底 + 两个交叠的白气泡），这次白气泡去掉。
-     ★ 只换图标，**窗口一个字都不动** —— 打开来还是记事本。用户原话
-       「里面就也和其他一样」，所以这里不碰 .win / .wtb / .wtx。
-     尺寸 16px 见方，和上面那张纸的 15×18 差不多 —— 一排看下来不会歪。
-     ⚠⚠ 两条伪元素**必须显式关掉**，不能只是"把上一版那两条 wx 规则删了"：
-       `.ic .pg::before/::after` 的**基样式还在**（蓝标题条 + 灰横线），
-       删掉覆盖它们就露出来，图标会变成"绿底 + 蓝条 + 灰线"。
-       `content:none` = 这个伪元素根本不生成，比画成透明干净。 */
+  /* 联系方式使用 16px 纯绿图标，窗口仍为记事本。
+       显式 content:none 撤掉纸张基样式的两条伪元素。 */
   .ic .pg.wx{width:16px;height:16px;margin:1px auto 2px;
     background:#3ec15b;border:1px solid #2b9c46;border-radius:3px}
   .ic .pg.wx::before,
@@ -226,14 +180,13 @@
   /* 窗口占了桌面 70% 宽时草地只剩一条边 —— 收小并挪到右下，把桌面让出来。
      尺寸是倒推的：内容区宽 166px ÷ 等宽字 7.2px/汉字 = 21 字，
      高 144px ÷ 行高 9.23 = 15 行，DOC 正好按这两条断的行。 */
-  /* ★ `display:none` 是新的：窗口现在由 FILES 表生成（一个文件一个），
-     开哪个由 JS 设 display —— 上一版是一个写死的窗口，加第二个都做不到。 */
+  /* 窗口由 FILES 生成，默认隐藏，显示状态由 JS 管理。 */
   .win{position:absolute;left:78px;top:26px;width:178px;height:162px;display:none;
     background:#fff;border:1px solid #0f4a86;border-radius:3px;overflow:hidden;
     box-shadow:2px 2px 4px rgba(0,0,0,.42)}
   /* 标题栏：能拖（移动窗口）+ 上面三个按钮能点。
      `user-select:none` 不省 —— 拖的时候会把标题文字刷成蓝色选中态，
-     在那个尺度下看着像标题栏坏了。`.wtx` 的选区**不动**（屏幕里的字要能选）。
+     在那个尺度下看着像标题栏坏了。`.wtx` 的选区不动（屏幕里的字要能选）。
      `touch-action:none` 是给触摸屏的：不加，手指拖标题栏会被当成滚动页面。 */
   .wtb{height:12px;display:flex;align-items:center;gap:3px;padding:0 2px 0 3px;
     background:linear-gradient(180deg,#5ba3ea 0%,#2470c9 8%,#1a5aac 90%,#134a92 100%);
@@ -250,8 +203,8 @@
     font:700 5px/7px Tahoma,sans-serif;text-align:center;color:#fff;
     text-shadow:none}
   .wtb .bz b:hover{background:linear-gradient(180deg,#b9d8f7,#4b8ad8)}
-  /* 正文用黑体（用户指定）。★ 37 段在屏上只有 15 行可见，
-     所以这里是**真能滚**的 —— CSS3D 里挂的是真 DOM，滚轮事件到得了。 */
+  /* 正文用黑体。37 段在屏上只有 15 行可见，所以这里是真能滚的 ——
+     CSS3D 里挂的是真 DOM，滚轮事件到得了。 */
   .wtx{position:absolute;left:0;right:0;top:12px;bottom:0;padding:3px 5px;
     font:6.5px/1.42 "SimHei","Heiti SC","Microsoft YaHei",sans-serif;
     white-space:pre-wrap;color:#111;overflow-y:auto;overflow-x:hidden}
@@ -261,12 +214,7 @@
   .wtx::-webkit-scrollbar-thumb{background:linear-gradient(90deg,#e2eaf4,#b3c8e2);
     border:1px solid #93aecd;border-radius:1px}
   /* 任务栏 */
-  /* ★ z-index 是必需的，不是装饰：窗口的 y 上限是 186（SH−12），而窗口高 162，
-     所以拖到下半屏的窗口**必然会盖住任务栏**。一盖住，任务栏上那个"找回最小化
-     窗口"的按钮就点不到了 —— 而它是唯一入口。真 Windows 里任务栏也永远在最上层。
-     出图时才发现的：`_shots/desk-windows.png` 任务栏右半段是纯白（255,255,255），
-     不是"按钮没建出来"，是 about 窗口的白底压在上面。
-     窗口的 z 从 1 起、每次点击 +1，到不了 9999。 */
+  /* 任务栏 z-index:9999 高于所有窗口，保证最小化后始终可通过按钮找回。 */
   .tb{position:absolute;left:0;right:0;bottom:0;height:13px;display:flex;
     z-index:9999;
     align-items:center;gap:3px;padding:0 3px;
@@ -277,11 +225,8 @@
     border:1px solid #1e5c11;box-shadow:inset 0 1px 0 rgba(255,255,255,.4);cursor:pointer}
   .tb .st:hover{filter:brightness(1.12)}
   .tb .st:active{filter:brightness(.9)}
-  /* 任务栏中间那格：上一版是**一个写死的标题**，现在改成每个已开窗口一个按钮。
-     不加这个，"最小化"就等于"关闭" —— 按钮名不副实。点按钮还原 / 再最小化。
-     屏幕只有 278px 宽（`.bezel` 380−64=316，`.well` 再减左右 padding 38），
-     扣掉"开始"和时钟，四个按钮分不到多少 —— 所以按钮一律 flex:1 + 省略号，
-     不许撑开。 */
+  /* 任务栏为每个已开窗口生成按钮，点击切换还原/最小化。
+       按钮 flex:1 并省略溢出标题，避免撑出 278px 桌面。 */
   .tb .tks{flex:1;display:flex;gap:2px;min-width:0;overflow:hidden}
   .tb .tkw{flex:1;min-width:0;padding:1px 4px;border-radius:2px;cursor:pointer;
     background:rgba(255,255,255,.22);
@@ -307,13 +252,8 @@
    → 屏幕里可交互；Esc 退回。 */
 var Q = new URLSearchParams(location.search);
 
-/* ★ `?w=&h=`：被父页挂进 iframe 时**必须由外面告诉它多大**。这一页在解析期
-   就读 innerWidth/innerHeight 建相机（`aspect = W/H`），而父页那边是
-   "先 display:block 再填 src"—— 填 src 的那一刻文档还没有布局，量到 0×0，
-   `aspect = 0/0 = NaN`，相机矩阵整个坏掉（不报错，只是画面空）。
-   仓库里为同一件事付过一次代价（`town.html` 挂进 iframe 那次只剩底色）。
-   ★ 不用 `parseInt(v) || dflt`：`?w=0` 会被 `||` 静默换成默认值 ——
-   「`||` 吃 0」这个坑在本仓库踩过一次（`?glow=0` 那次）。 */
+/* iframe 父页通过 ?w=&h= 显式传尺寸，供解析期建立相机 aspect=W/H。
+   参数解析保留 0，不使用 parseInt(...)||默认值。 */
 function qnum(k, dflt){
   var v = parseInt(Q.get(k), 10);
   return (isFinite(v) && v > 0) ? v : dflt;
@@ -326,13 +266,7 @@ var PIN = {
   t:     Q.has('t')     ? parseFloat(Q.get('t')) : null,   // 冻结时间（秒）
   dbg:   Q.has('dbg')
 };
-/* `?gate=1`：入场钟**先冻着**，等父页叫（`well-go`）才起。
-   为什么需要它：这个钟是"文档活了多久"，而父页是在**黑幕开始往下落的同一刻**
-   才填 src 的 —— 不冻的话那 0.9s 淡入 + 6s 转圈整段演在黑幕后面。
-   井那边是同一个问题、同一个解法（见 `fx-throw.html` 的 GATE 和 town.html
-   的 `wellGo()`）。
-   ★ 闸冻的是**钟不是画面**：下面 frame() 里照常渲染第 0 帧，只是 `t` 不动。
-     这样解冻前后是**连着**的，不会跳一下。 */
+/* ?gate=1 将入场时钟冻结到 well-go；仍渲染第 0 帧以保证解冻连续。 */
 var GATE = Q.has('gate');
 
 var scene  = new THREE.Scene();
@@ -356,23 +290,8 @@ function mkEl(cls, w, h, html){
 }
 function add(el, x, y, z, rx, ry){
   var o = new THREE.CSS3DObject(el);
-  /* ★★ 2026-10-09：three.js 的 `CSS3DObject` 会往 element 上写一条**内联**
-     `pointer-events:auto`（见 `CSS3DRenderer.js:14`），**内联的优先级高过任何
-     CSS 规则** —— 所以上面那条 `.face{pointer-events:none}` 对这六个面
-     **一个字都没生效**，等于白写。
-
-     这就是用户第四次报障的读数为什么长那样：我让开了 `.bezel`/`.well`
-     （普通子元素，CSS 说了算），但最外层的 `.front` 是 `CSS3DObject` 的 element，
-     让不开 ⇒ hit-test 从 `.bezel` 退到 `.front` 就**停住了**（他的台账：
-     `elementFromPoint` 8/8 报 `div.face.front`，`.scr` 却好端端在几何摞里）。
-
-     ★ 删掉这条内联之后，`.front` 会继承渲染器容器 `cameraElement` 上那条
-       `pointer-events:none`（`CSS3DRenderer.js:79`），整棵外壳自然让开；
-       `.screen` 用 CSS 显式写回 `auto` 接住（`pointer-events` 是继承属性，
-       祖先 none 时后代不写 auto 就一起失灵）。
-     ★ `.lip` / `.slot` / `.brand` 这些是普通 DOM 子元素，跟着继承，不用单独写。
-     ★ `#hud` / `#dbg` / `#esc` 挂在 `body` 上（281-283 行），不在 `#stage` 里，
-       一点不受影响。 */
+  /* CSS3DObject 会写入 pointer-events:auto，创建后需移除该内联属性。
+       机身随后继承容器的 none，.screen 显式 auto 接收事件；body 上的 HUD/退出键不受影响。 */
   el.style.removeProperty('pointer-events');
   o.position.set(x, y, z);
   o.rotation.set(rx || 0, ry || 0, 0);
@@ -382,16 +301,10 @@ function add(el, x, y, z, rx, ry){
 
 /* 正面 —— 屏幕是它的子元素，前框对屏幕的遮挡天然正确 */
 var APPLE_SVG = '<svg viewBox="0 0 17 20"><path fill="currentColor" d="M13.9 10.6c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9s-1.9-.9-3.1-.8c-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.5.8 1.1 1.7 2.4 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.7c1.3 0 2.1-1.2 2.9-2.3.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.5-1-2.5-3.8zM11.6 3.4c.7-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.2 1.9-1 3 1 .1 2.1-.5 2.8-1.4z"/></svg>';
-/* 屏幕里那份文档。**内容是我写的占位**，结构照原片那屏（顶格引子 + 几节
-   小标题带缩进正文 + 分隔线 + 居中署名 + 一行省略号）；等用户把自己的
-   "设计理解"给我，换掉 DOC 这一个变量即可，版式不用动。 */
-/* ── 屏幕里那份文档 ──────────────────────────────────────────────
-   内容是用户从他自己的读书笔记里选的 37 段（Desktop\xiaoku.docx）。
-   结构就是他给的：**先书名号（取自哪里），再编号段落**。
-   ★ 这一段由 `_logs/build-doc.py` 生成 —— 要改文案，改 docx 再重跑脚本，
-     别手改下面这个数组。条目号是渲染时按顺序发的，所以数不错。
-   ★ 切分有一条不能省的规矩：条目号必须**递增**才算新条目。因为 14/15/16/34
-     四段的正文里自带 "1. 2. 3." 的子列表，只认「行首是数字」会把它们切碎。 */
+/* 屏幕里那份文档的版式：顶格引子 + 几节小标题带缩进正文 + 分隔线 + 居中署名 +
+   一行省略号。内容见下面的 DOC。 */
+/* DOC 为读书笔记的 37 段，由 _logs/build-doc.py 从 xiaoku.docx 生成。
+   改文案应修改源文档并重建；仅递增条目号开启新段，避免拆开正文子列表。 */
 var SRC = [
 ["不能结束的辩论", [
   "呵呵，又是这种SB对手。\n我大力拍桌站起，手掌皮肤生疼火辣。\n所有人的目光凝视着我，教室安静一片。\n这是在哪？这是在干什么？\n哦，原来我不在打辩论，我在自习。",
@@ -466,14 +379,8 @@ var DOC = (function () {
   return out.join('\n');
 })();
 
-/* ── 正式内容的字幕 + 游戏名清单 ────────────────────────────────────
-   数据是**从 town.html 抄下来的**，不是这边的原创：那 7 套 `.vt-set` 才是源
-   （书店 / 开发室 / 暗房 / 游戏厅 / 调度室 / 联系方式 / 打赢）。
-   ★ 改了 town.html 上的字幕，这里**不会跟着变** —— 两份就漂了。
-     真要改，两处一起改；或者将来把这张表抽出去共用。现在先手工对齐，
-     因为这四行字两年里大概只会动一次。
-   ★ 一字未改照抄，包括：`……` 单独成行的两处（那是**停顿**不是空行）、
-     游戏厅第 4/5 句是**一句跨两行**（别当两句读）。 */
+/* 字幕以 town.html 的 .vt-set 为源，修改时同步两处。
+   独立省略号保留为停顿，游戏厅跨行句保留原行序。 */
 var SUBS = [
   ["书店", ["在无暇思想的时候", "我空闲的无所事事惹起了", "我无端的恼怒",
             "于是去书写和观察自己", "或别人的人生"]],
@@ -495,9 +402,7 @@ var SUBS = [
             "“原来是入口啊，那不得不进去了”", "于是……"]],
 ];
 
-/* 游戏名。★ 按用户给的顺序**原样照录**，一个都没有重排 ——
-   `不/存在的你，和我` 里那个斜杠是名字的一部分，不是分隔符；
-   `Slay the Princess` / `The Walking Dead` / `sinisistar2` 的大小写也照抄。 */
+/* 游戏名保持给定顺序、大小写和内部斜杠。 */
 var GAMES = [
   "去月球", "逃离鸭科夫", "战地风云6", "不/存在的你，和我", "纸房子",
   "极乐迪斯科", "底特律变人", "江山北望", "ZATO", "名利游戏",
@@ -508,10 +413,7 @@ var GAMES = [
   "特工17", "永恒世界", "凤凰",
 ];
 
-/* ★ 联系方式这份是这里**独有**的，town.html 上没有对应物（联系页那张幕上
-   只有「微信 · QQ」两行字，没有号）。号从 contact.html 的 `LINKS` 表抄来。
-   ⚠ 微信号是**全小写**的 `sc15706810262`：contact.html 里专门有一条注释记着
-     它曾被大写成 `SC…`，那种错**看着没毛病**，照着输就是加错人。 */
+/* 联系方式与 contact.html 的 LINKS 保持同步，微信号使用小写 sc15706810262。 */
 var CONTACT = [
   "微信：sc15706810262",
   "QQ：1239486160",
@@ -519,14 +421,7 @@ var CONTACT = [
   "PS：这应该算隐藏结局或者捷径了",
 ].join('\n');
 
-/* ── 作者说 ─────────────────────────────────────────────────────────
-   用户 2026-10-12 给的原话，**一字未改**。三处是刻意的、别"修"：
-     ① 第 1 条**本身跨四行** —— "比如…/不知是…/二者皆有可能…" 是它的续行，
-        不是另外三条。所以条目之间才靠空行隔开，续行不隔。
-     ② 第 4 条写的是 `4这个数字不吉利`，**没有那个点**。别顺手补上 ——
-        原话就是这样，补了就是改了用户的字（第 5 格那个「激热」同理，当时
-        也没改）。要是他本意是漏打，他自己会说。
-     ③ 第 2 条的引号是**半角** `"` 不是 `“”`，照录。所以这一行用单引号包。 */
+/* 作者说按空行分条，条内续行不拆分；保留「4这个数字不吉利」及半角引号。 */
 var AUTHOR = [
   "1.啊，终于——其实并没有终于，完全还有很多想搞的东西",
   "比如战斗之后本来计划了个雨爱替换cg的，不过",
@@ -563,45 +458,27 @@ var DOC2 = (function () {
   return out.join('\n');
 })();
 
-/* ── 桌面上的文件 ──────────────────────────────────────────────────
-   ★ 一张表说了算。图标（`.ic`）、窗口（`.win`）、任务栏按钮**都由它生成** ——
-     上一版是硬编码四行图标 + 一个写死的窗口，于是"放好几个文件"这件事
-     在结构上就做不到（加第二个要改三处 HTML、还得手抄一套窗口 DOM）。
-   改文案只改这张表：`name` 是文件名，`doc` 是窗口正文，`at` 是图标位置，
-   `w` 是窗口开出来的落点（四个错开，不然第二个开出来正好盖住第一个）。
-   ★ `doc` 里的 `\n` 会真换行（`.wtx` 是 `white-space:pre-wrap`）。 */
+/* FILES 统一生成图标、窗口和任务栏：name 为文件名，doc 为正文，at 为图标位置，w 为窗口初始位置。
+   .wtx 使用 pre-wrap 显示换行。 */
 var FILES = [
-  /* 四个文件的内容全部来自别处，不在这张表里现写：
-     `DOC` = 自选段落（本文件上部），`DOC2` = 字幕 + 游戏名，`CONTACT` = 联系方式。
-     ★ 只有 `doc` 是"还没内容"时才把占位串写在表里（作者说那一格）。 */
+  /* 各文件引用 DOC/DOC2/CONTACT 等已定义内容，缺省项才使用占位文本。 */
   { id:'books',   at:[6, 22], w:[78, 26], name:'书店摘录.txt', doc:DOC },
   { id:'subs',    at:[6, 61], w:[62, 40], name:'字幕.txt',     doc:DOC2 },
   { id:'author',  at:[6,100], w:[94, 18], name:'作者说.txt', doc:AUTHOR },
-  /* ★ `ic:'wx'` 只换**桌面图标**那一个方块（CSS 里 `.ic .pg.wx`）。
-     窗口照旧是记事本 —— 用户原话「里面就也和其他一样」。 */
-  /* ★ 联系方式是桌面上**唯一不在左边那一列**的图标（用户 2026-10-12 要
-     "放在电脑中间"）。坐标是算出来的、不是试出来的：桌面 `SW`=278 宽、
-     图标 `.ic` 宽 38 ⇒ 水平居中 x=(278−38)/2=**120**。
-     ★ 垂直位置他当天又改了一次：「往下移一格，因为前面那个网页没掉下来的时候
-     太突出了」。**一格就是左边那一列的间距 39**（22→61→100 正是按它排的），
-     于是 86+39=**125** —— 从"正中"变成"中线偏下"。
-     ⚠ 开局默认开着的那扇窗口（books，落点 `[78,26]`，178×162，下沿到 188）
-       **照样把它整个盖住** —— 用户知道并接受（原话"可以挡一下"）。关掉窗口、
-       或把它拖开，绿块才露出来。 */
+  /* `ic:'wx'` 只换桌面图标那一个方块（CSS 里 `.ic .pg.wx`）。窗口照旧是记事本。 */
+  /* 联系方式图标水平居中 x=120，y=125；默认 books 窗口可将其遮住，拖开或关闭后露出。 */
   { id:'contact', at:[120, 125], w:[50, 54], name:'联系方式.txt', doc:CONTACT, ic:'wx' },
 ];
 
 /* 塞进 innerHTML 的东西一律先转义。`DOC` 是脚本生成的、现在没有这几个字符，
-   但用户将来填的内容会有 —— 一个 `<` 就能把窗口拆了，而且不报错。 */
+   但以后填的内容会有 —— 一个 `<` 就能把窗口拆了，而且不报错。 */
 function esc(s){
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/* 桌面图标。`data-id` 是它和窗口 / 任务栏按钮之间**唯一**的纽带 ——
+/* 桌面图标。`data-id` 是它和窗口 / 任务栏按钮之间唯一的纽带 ——
    三处都靠它对上，所以拼错一个字母就是静默失效（点了没反应，不报错）。 */
-/* 图标的样子由 `f.ic` 决定（没有这个字段就是默认那张纸）。
-   ★ 只加 class、不换标签 —— `.ic.on` 的高亮、`data-id` 那条纽带、以及
-     `nearIcon()` 的命中判定全都挂在 `.ic` 这一层，动里面那格不影响它们。 */
+/* f.ic 只改变图标内部样式；外层 .ic 保留高亮、data-id 和命中判定。 */
 function iconsHTML(){
   return FILES.map(function(f){
     return '<div class="ic" data-id="' + f.id + '" style="left:' + f.at[0]
@@ -634,61 +511,35 @@ var frontEl = mkEl('front', BW, BH, ''
   +     '<i class="cl" style="left:3%;top:2%;width:46px;height:11px"></i>'
   +     '<i class="cl" style="left:20%;top:8%;width:26px;height:8px"></i>'
   +     '<i class="cl" style="right:2%;top:26%;width:19px;height:7px"></i>'
-  /* 桌面上的几个 txt —— 由 FILES 生成（见上）。
-     `.on` 不写在这里：哪个开着是运行时的状态，写死在 HTML 上第一帧就会被
-     sync() 改掉，留着只会让人以为它是初始值。 */
+  /* 图标由 FILES 生成，选中状态交给 sync()。 */
   +     iconsHTML()
   +   '</div>'
-  /* 窗口一次全建出来（`display:none` 待命），开哪个由 sync() 定。
-     不做"点开时才 appendChild"是为了让 `winEls[]` 在绑事件那一刻就齐了 ——
-     动态插入的话，绑事件和建元素之间有一步没接上就静默失效。 */
+  /* 窗口预先创建为 display:none，再由 sync() 控制；事件绑定时 winEls 已完整。 */
   +   FILES.map(winHTML).join('')
-  /* 任务栏：开始 / **每个已开窗口一个按钮** / 时钟。
-     中间那格上一版是一个写死的标题 —— 所以"最小化"当时在结构上就没法实现：
-     最小化完没有任何地方能把它找回来，那等于关闭。 */
+  /* 任务栏为每个已开窗口生成按钮，支持恢复最小化窗口。 */
   +   '<div class="tb"><span class="st">开始</span>'
   +     '<span class="tks"></span>'
   +     '<span class="ck">10:24</span></div>'
   + '</div></div></div></div>'
   + '<div class="slot"></div>'
-  /* 机型名在台阶**里面** —— 见 .brand 那条注释，挂平级会被台阶盖住 */
+  /* 机型名在台阶里面 —— 见 .brand 那条注释，挂平级会被台阶盖住 */
   + '<div class="lip"><div class="brand">' + APPLE_SVG
   +   '<span>Macintosh Classic</span></div></div>'
   + '<div class="lip-top"></div>');
 add(frontEl, 0, 0, BD / 2);
 
-/* ── 屏幕里的窗口管理 ──────────────────────────────────────────────
-   2026-10-08 新加。上一版这段只有"画出来的"窗口，一条交互都没有 ——
-   用户原话：「你那个页面似乎也用不了，不能叉掉、最小化什么的。
-   **我本来要放好几个文件在那里的**。」
-
-   ★ 为什么挂在这层 DOM 上能成立：见 `.scr` 上面那条更正。`_logs/_deskhit.py`
-     实测过 —— `elementFromPoint` 拿到的就是那个 `<b>`，真鼠标事件也照常到达。
-     原来那句"指针到不了"是错的。
-   ★ 一处都不 stopPropagation：`goInside()`（点屏幕拉正放大）靠的就是这两个
-     事件冒泡到 window，掐掉就等于把进门的唯一一条路堵了。
-
-   状态全在 WIN 里，DOM 只是它的投影，改动一律走 sync() 这一个出口 ——
-   这样不会出现"改了状态忘了刷 DOM"，那类 bug 只在你正好看着它的时候才不存在。 */
+/* 窗口状态保存在 WIN，统一由 sync() 投影到 DOM。
+   不阻断事件冒泡，保留 window 上 goInside() 的屏幕放大入口。 */
 var SW = 278, SH = 211 - 13;    /* 屏幕逻辑尺寸 / 可用高（扣掉任务栏 13）。
    这两个数是从 CSS 倒推的，不是随手写的：.face 380 − .bezel 左右 32×2 = 316，
-   .well 再减左右 padding 19×2 = **278**；高 .well 252 − 23 − 18 = **211**。
+   .well 再减左右 padding 19×2 = 278；高 .well 252 − 23 − 18 = 211。
    `_deskhit.py` 量到 `.scr` 在 1440×900 下是 858×651 —— 858/278 = 3.086、
    651/211 = 3.085，一致，就是这么核出来的。 */
 var WINW = 178, WINH = 162;     /* 和 CSS 里 `.win` 的 width/height 同源 */
 var Z = 1;
 var WIN = {}, winEls = {}, iconEls = {}, pd = null, wdrag = null;
-/* ── 指针台账（只印在 `?dbg=1` 的那个读数盒子里）──────────────────────
-   存在的理由：用户报「屏幕放大了，但里面的图标连变色都没有」，而我在
-   headless / 有头 / 1440×900 / 1920×1080 / 1280×720 / dpr 1 / 1.25 / 1.5
-   这一堆条件下**一次都复现不出来**（`_logs/_heroray.py` ⑥ 六档全开）。
-   能确证的只有：`goInside()` 也挂在 pointerup 上、他那儿**成功**了
-   ⇒ pointerup 没丢。于是嫌疑只剩「按下那一刻 `t.closest('.ic')` 是空的」
-   —— 也就是**他看见的图标和浏览器判定的命中区不是一回事**。
-   这一栏把「按下时命中了谁」「松手时判定成什么」直接印在屏幕上：
-   他截一张图，就能把「事件没到」「命中了别的东西」「位移超阈值被丢」分开。
-   ★ 判据要打 `hitOf()`（走祖先链），不能打 `className` 的第一个词 ——
-     `.ic` 中心那一点是它里面画的纸 `.pg`，`elementFromPoint` 报 `.pg` 是对的。 */
+/* ?dbg=1 记录按下目标、松手结果与位移阈值，区分命中失败和拖动取消。
+   hitOf() 按祖先链分类，允许图标内部 .pg 成为真实 target。 */
 var evLog = [];
 function evName(t){
   if (!t || !t.tagName) return '(null)';
@@ -703,9 +554,7 @@ function hitOf(t){
        : t.closest('.bz b') ? 'btn' : t.closest('.win') ? 'win'
        : t.closest('.screen') ? 'screen' : 'other';
 }
-/* `t` 是可选的第四个参数：兜底层判定出来的目标元素。不给就还是 `e.target`
-   （也就是浏览器判的那一个）—— 这样台账里"浏览器判的"和"兜底层判的"能印在
-   同一种格式里，一比就知道救援有没有在干活。 */
+/* 可选 t 为几何回退目标，不传则取 e.target；两种来源使用相同日志格式。 */
 function evLog_(k, e, extra, t){
   t = t || e.target;
   evLog.push(k + ' ' + hitOf(t) + ' ' + evName(t)
@@ -713,33 +562,9 @@ function evLog_(k, e, extra, t){
   if (evLog.length > 6) evLog.shift();
 }
 
-/* ★★ 2026-10-09：用户第四报「**在没有放大屏幕时，我鼠标经过倒是会有 UI 变色，
-   但是点进去就根本就像个图片了**」—— 也就是 `inside` 相位整个屏幕对指针失去反应，
-   而 `ready` 相位是好的。本机复现不出来：`_deskdbg.py` 走**真事件管线**（CDP 发
-   mouseMoved 再看 `:hover` 匹不匹配，这才是输入管线，`elementFromPoint` 是直接查询、
-   不经过它）量到 `inside` 下 `:hover` 链一路走到 `div.ic > div.pg`，命中测试是通的。
-
-   "像个图片"有两种成因，**它们在他的屏幕上长得一模一样**：
-     ① 事件**根本没进这个文档**（这一层外面有东西盖着 / 没拿到指针）
-     ② 事件到了，但**没落在那些元素上**
-   `evLog` 只在 `.scr` 上记（事件代理），①那种情况**一行都不印** ——
-   而"什么都没印"和"他没点"看起来是一回事，光看那本台账判断不了。
-   所以再挂一层 **window 捕获** 的计数器：不管命中谁都加一。两级一比，①/②当场分开：
-
-     window 涨、.scr 不涨  ⇒ ①，有东西盖在屏幕上（而且是在这一层文档里的）
-     window 也不涨         ⇒ 事件压根没进来（父页那一层或更外面挡着）
-     两级都涨、hit 是 other ⇒ ②，命中判定偏了
-
-   ★ 这层监听只加一个计数，不碰 `e`、不 `preventDefault`、不 `stopPropagation`。
-
-   ★★ 2026-10-09 晚：读数回来了 —— **window 67 次 / 屏幕区 17 次**，有 50 次
-   进了这一页却没进屏幕区。但这两个数是**总量**，定不了案：分不清那 17 次是
-   "点在图标上"还是"点在屏幕上想放大"。所以再分两维：
-     · `tapBy` 按**相位**分（`ready` 下屏幕只有 235×209，点在机身/空白上就是"只到 window"）
-     · `hitBy` 按**命中对象**分 —— 这一条是决定性的：
-       **`ic` 是 0 ⇒ 从来没有一次点击落在图标上**，那就不是"点不动"而是"瞄的不是那儿"
-   还要量出**他点的那一点离最近的图标有多远**（`nearIcon`）：他以为在图标上，
-   浏览器判在 40px 外 —— 那就是"他看到的图标位置"和"DOM 的 rect"不是一回事。 */
+/* window 捕获与 .scr 计数分别记录事件是否进入文档和屏幕。
+   tapBy 按相位、hitBy 按目标分类，nearIcon 记录到最近图标的距离。
+   监听只读，不阻断或取消事件。 */
 var nWin = 0, nScr = 0, nRescue = 0, lastWin = '', lastNear = '';
 var tapBy = {}, hitBy = {};
 function bump(o, k){ o[k] = (o[k] || 0) + 1; }
@@ -772,64 +597,33 @@ function fmtHit(){
   return out.length ? out.join(' · ') : '（无）';
 }
 
-/* ★★ `inside` 相位的几何普查（2026-10-09 加）。
-   用户第四报：**「屏幕放大正对时，怎么点都点不进屏幕区。只能没放大时点」** ——
-   也就是 `ready` 下 `.scr` 收得到 pointerdown（所以 `goInside()` 触发得了）、
-   `inside` 下**一次都收不到**。而 `.scr` 收不到时，上面那本点击台账里
-   **什么记录都不会有**（代理就挂在 `.scr` 上，事件压根没到它那儿），
-   光看点击记录查不出来。所以反过来问：**那一点上站的是谁**。
-
-   ★ `elementFromPoint` 走的**不是**输入管线 —— 前面量 `:hover` 时这是它的短处。
-     但**这里正要它的短处**：它回答的是"按几何算，谁在最上面"。
-       · 报的不是 `.scr` 的后代 ⇒ **真有东西盖在那儿**，名字就在读数里
-       · 报的**是** `.scr` 的后代、真实点击却进不去 ⇒ 输入管线与几何不一致
-   两个相位都跑，差的就只是相机位置 —— 一对比就知道是谁在 `inside` 冒出来的。 */
+/* 按 ready/inside 相位比较 elementFromPoint 的几何目标与实际事件目标，定位输入命中差异。 */
 var census = '', lastCensus = 0;
 function runCensus(){
   var pts = [['屏心', .50, .50], ['左上', .28, .28], ['右上', .72, .28],
              ['左下', .28, .72], ['右下', .72, .72]], out = [], i;
-  var sb = scrEl.getBoundingClientRect();     /* `.scr` 的**视觉/几何**盒子 */
-  /* ★★ `elementFromPoint` 吃的是**视口**坐标，所以打点必须用 `innerWidth/innerHeight`。
-     用 `W`/`H` 是错的 —— 那是 `?w=&h=` 传进来的**页面逻辑尺寸**，两者按理相等
-     （`qnum('w', innerWidth)` 的默认值就是 `innerWidth`），但那是"按理"。
-     这页一辈子活在 iframe 里，而父页 `town.html` 是**开机只量一次尺寸**的
-     （见记忆 `personal-site-town-embed-contract`）—— 量早了或没重量，传进来的
-     就与真实视口不符。那时候用 `W` 打点，打的是**另一个地方**，
-     读数会像"屏心空着"，而页面其实好好的。这就是"尺子坏了不是页面坏了"。 */
+  var sb = scrEl.getBoundingClientRect();     /* `.scr` 的视觉/几何盒子 */
+  /* elementFromPoint 使用真实 innerWidth/innerHeight 视口坐标，避免父页传入的逻辑 W/H 过期。 */
   var vw = innerWidth, vh = innerHeight;
   for (i = 0; i < pts.length; i++){
     var x = Math.round(vw * pts[i][1]), y = Math.round(vh * pts[i][2]);
     var t = document.elementFromPoint(x, y);
-    /* ★ 这一格是决定性的：`elementFromPoint` 说"那一点上是 `.bezel`"，
-       而 `.bezel` 是 `.screen` 的**祖先** —— 祖先盖不住后代。
-       ⇒ 唯一自洽的解释是**那一点根本不在 `.scr` 里**。
-       所以把"这点在不在 `.scr` 的矩形内"直接标出来，两个读数并排：
-         `(内)`  ⇒ 矩形说在、命中说不在 = 浏览器内部的几何不自洽
-         `(★外)` ⇒ 矩形也说不覆盖 = `.scr` 的位置/尺寸跟他看到的不一回事 */
+    /* 同时报告探测点是否落在 .scr 矩形内，与命中对象交叉检查。 */
     var ins = (x >= sb.left && x <= sb.right && y >= sb.top && y <= sb.bottom);
     out.push(pts[i][0] + ' ' + (t ? hitOf(t) + '/' + evName(t) : 'null')
              + (ins ? '(内)' : '(★外)'));
   }
-  /* ★ 现查，不靠外层变量 —— 这三个盒子在这里都只是"拿来读数"，
-     写死一个不存在的名字（我第一版就写成 `screenEl`）会在**帧循环里**抛
-     ReferenceError，症状是"画面还在动、读数不动"，很难认出来。 */
+  /* 诊断时现查相关盒节点，避免依赖已失效的外部引用。 */
   function rr(sel){
     var e = document.querySelector(sel);
     if (!e) return '（无）';
     var b = e.getBoundingClientRect();
     return [b.left, b.top, b.width, b.height].map(Math.round).join(',');
   }
-  /* ★★ 最强的一问：**按浏览器自己的算法，`.scr` 的中心在哪、那儿站着谁。**
-     如果连它自己的中心都不命中 `.scr` 的后代，那 `.scr` 的几何和他看见的
-     完全不是一回事（不是"相机没对准"能解释的）。
-     注意这是**包围盒**中心，透视投影下梯形包围盒的中心未必落在梯形内 ——
-     所以它只作佐证，判据仍以那一行的 `(内)/(★外)` 为准。 */
+  /* 检查 .scr 包围盒中心的命中对象；透视梯形的包围盒中心仅作辅助证据。 */
   var mx = Math.round(sb.left + sb.width / 2), my = Math.round(sb.top + sb.height / 2);
   var tm = document.elementFromPoint(mx, my);
-  /* ★★★ 屏心那一问的**结论句** —— 用户不用对坐标，念这一行就够。
-     只有两种可能，指向两种完全不同的修法：
-       在矩形外 ⇒ `.scr` 的位置/尺寸在他那儿真的不对（3D 变换 / 尺寸链）
-       在矩形内 ⇒ 浏览器自己的几何不自洽（合成/命中测试层面） */
+  /* 探测点在矩形外提示尺寸/变换偏差，在矩形内却未命中提示合成或命中差异。 */
   var hx = Math.round(vw / 2), hy = Math.round(vh / 2);
   var ht = document.elementFromPoint(hx, hy);
   var hHit = ht ? hitOf(ht) : 'null';
@@ -844,14 +638,8 @@ function runCensus(){
     verdict = '★★ 屏心在 .scr 矩形**内**，命中的却是 ' + (ht ? evName(ht) : 'null')
       + ' —— 矩形自洽但命中测试走不到，是浏览器的几何不一致';
   }
-  /* ★★★ 屏心那一点上**从顶到底**摞了谁。`elementFromPoint` 只回答最上面那一个，
-     看不到"被截的那位在不在下面一层"。用户猜是"点击被放大截获了" ——
-     这个 API 直接回答"截获者是谁、它下面是屏幕还是机身"。 */
-  /* ⚠ 只读**集合**，不读顺序 —— CSS3D 的 z 序是**投影之后**才决定的，而
-     `elementsFromPoint` 按 CSS 层叠排，在 3D 场景下它会给出和
-     `elementFromPoint` 矛盾的首位（本机实测：它说顶上是 `div.face` 机身壳，
-     而 `elementFromPoint` 说顶上是 `div.wtx`）。顺序那一半不可信，
-     但"这个点上有哪些元素"是准的。 */
+  /* elementsFromPoint 输出该点各候选层，补充单一顶层命中读数。 */
+  /* CSS3D 下 elementsFromPoint 只用于候选集合；整体顺序可能与 elementFromPoint 不一致。 */
   var stack = [], scrInStack = false;
   try {
     var raw = document.elementsFromPoint(hx, hy);
@@ -876,20 +664,11 @@ function runCensus(){
     + '\n  .scr ' + rr('.scr') + '   .screen ' + rr('.screen') + '   .bezel ' + rr('.bezel')
     + '\n  .screen ' + cs('.screen', ['pointerEvents', 'overflow', 'borderRadius'])
       + '   .scr ' + cs('.scr', ['pointerEvents', 'overflow'])
-      /* ★ 2026-10-09：这三个该是 `none / none / none`、`.screen` 是 `auto`。
-         只要 `.front` 报 `auto`，就说明 three.js 那条**内联**样式还在压着 CSS
-         （`add()` 里已经删了它，报 auto 就是又漏回去了）。 */
+      /* 外壳三层预期 pointer-events:none，屏幕为 auto；检查是否残留 CSS3D 内联覆盖。 */
       + '\n  外壳 pointer-events  .front ' + cs('.front', ['pointerEvents'])
       + '   .bezel ' + cs('.bezel', ['pointerEvents'])
       + '   .well ' + cs('.well', ['pointerEvents'])
-      /* ★★ 2026-10-09（用户第四报的收口）：**六个面全列**。上面那一行只盯着 `.front`，
-         可 six 个面里任何一个没让开都够截获点击 —— 而且最像真凶的恰恰不是 `.front`：
-         `back`/`side`/`top` 在 DOM 里排在 `front` **之后**，CSS 层叠上反而压在它上面
-         （用户那本台账里 `elementsFromPoint` 第一位那个 `div.face` 就是它们中的一个）。
-         判据：这一行该是「（一个都没有 ✓）」。冒出任何一个面，就说明 three.js 那条
-         **内联** `pointer-events:auto`（`CSS3DRenderer.js:14`）从哪儿又漏回来了。
-         ★ 为什么非要这一行：这一支修法**本机复现不出好坏**（四种视口 × 两档 dpr
-         全是绿的），他那边强刷之后如果还不行，这一行就是唯一能指认"卡在哪个面"的读数。 */
+      /* 逐面检查六个 face 的 pointer-events，定位残留 auto 的外壳面。 */
       + '\n  六个面里 pe 非 none 的：' + (function(){
           var ls = document.querySelectorAll('.face'), o = [];
           for (var i = 0; i < ls.length; i++){
@@ -931,9 +710,7 @@ FILES.forEach(function(f){
 
 function topZ(){ return ++Z; }
 
-/* 任务栏按钮：每个**开着**的窗口一个（关掉的不留 —— 留了就是"点了没反应"）。
-   `.on` 给 z 最大且没最小化的那个，不是"所有可见的" —— 同时开三个时
-   得一眼看出现在在看哪一份。 */
+/* 任务栏只列已开窗口；.on 对应未最小化且 z 最大的当前窗口。 */
 function syncTask(){
   var live = FILES.filter(function(f){ return WIN[f.id].open; });
   var top = null, tz = -1;
@@ -986,22 +763,8 @@ function taskAct(id){
   sync(id);
 }
 
-/* 屏幕里按下之后的四支判定（图标 / 任务栏 / 三个按钮 / 窗口）。
-   `t` 是**已经判定好**的目标元素 —— 浏览器给的那个，或者几何兜底挑出来的那个
-   （见下面 `geoTargetAt`）。抽成具名函数就是为了让那两条路复用同一套逻辑：
-   兜底那条只是换了个 `t`，这四支一个字都不用改。
-
-   ★ `zoom` 也算"在里面"（2026-10-08 补）。原来只认 `inside`，于是点开屏幕后
-   那 ~1.3 秒里（镜头还在推近）**屏幕上每一次点击都被原样丢掉** ——
-   可那 1.3 秒里屏幕**已经看着是满屏的了**，用户的手早就放上去了。
-   用户报的「屏幕放大了，但里面的图标 / 窗口 / 叉号点了没反应」就是它，
-   `_logs/_heroray.py` ⑥ 复现出来是四次连点全无反应、1.5 秒后才开。
-   图标 / 任务栏 / 三个按钮都是**瞬时**动作，命中由浏览器在按下的那一刻判，
-   镜头还在飞也判得准，所以现在一律放行。
-   ★ 只有**拖标题栏**仍旧要求 `inside` —— 那个位移要拿 `scrEl` 的 rect 反算缩放
-     （见下面 `wdrag.k`），镜头移动时 rect 每帧在变，拖起来会飘。
-   `ready` / `back` 仍挡着：那时屏幕只有几十像素宽，点不准，而且 469 行已经把
-   `.screen` 排除在相机拖动之外，两边互不打扰。 */
+/* 浏览器目标和几何回退目标复用同一套屏幕操作分发。
+   zoom/inside 均允许图标、任务栏和按钮点击；标题拖动仅 inside 启用，避免移动相机下反算缩放漂移。 */
 function screenDown(t, e){
   if (!t || !t.closest || e.isPrimary === false || e.button !== 0) return;
 
@@ -1025,14 +788,11 @@ function screenDown(t, e){
   if (w){
     var id = w.getAttribute('data-id'), s = WIN[id];
     s.z = topZ(); sync(id);           /* 点窗口任意处 → 提到最前 */
-    /* 标题栏 → 开始拖。★ 最大化时不给拖：x/y 是"还原后回哪"的备份，
+    /* 标题栏 → 开始拖。最大化时不给拖：x/y 是"还原后回哪"的备份，
        拖动会把它改掉，于是 □ 还原就回不到原处了。要挪先按 □ 还原。 */
     /* `phase === 'inside'` 是必须的：`wdrag.k` 用 rect 反算缩放，镜头还能动时会飘 */
     if (phase === 'inside' && t.closest('.wtb') && !s.max){
-      /* 屏幕在页面上被 CSS3D 缩放过（1440×900 下是 3.086×），位移不能直接加，
-         得除以当前缩放才是屏幕内部 px。用**差分**不用绝对坐标：差分对仿射
-         变换成比例，斜视时那点透视误差远小于手感阈值。
-         `|| 1` 是兜底：屏幕还没布局时 rect.width 是 0，除零会把窗口送走。 */
+      /* 窗口拖动差值除以 .scr 当前屏幕缩放，换算为桌面内部像素；未布局时比例回退 1。 */
       wdrag = { id:id, x:e.clientX, y:e.clientY, ox:s.x, oy:s.y,
                 k:(scrEl.getBoundingClientRect().width / SW) || 1 };
     }
@@ -1040,10 +800,7 @@ function screenDown(t, e){
 }
 
 scrEl.addEventListener('pointerdown', function(e){
-  /* 这一层收到 == 事件确实走进了屏幕区。★ 和上面 window 捕获层记的是**同一相位**：
-     捕获先于目标阶段，两个监听器之间不会有帧、`phase` 不会变。
-     ★ 注意这一层**不**让兜底层替它计数（见下面 `nRescue`）—— `nScr` 的原意就是
-       "浏览器真的把事件送到了屏幕区"，补上它就等于把诊断信号抹掉。 */
+  /* nScr 仅统计浏览器真实送达屏幕的事件，几何回退另计 nRescue，保留诊断差异。 */
   nScr++;
   (tapBy[phase] || (tapBy[phase] = [0, 0]))[1]++;
   evLog_('↓', e, ' phase=' + phase);
@@ -1051,34 +808,9 @@ scrEl.addEventListener('pointerdown', function(e){
   screenDown(e.target, e);
 });
 
-/* ── 命中判定的几何兜底 ────────────────────────────────────────────
-   ★★ 2026-10-09，用户第四报。他那本台账把范围钉死在 **hit-test 那一层**：
-
-     几何普查 屏心 other/div.face.front(内) · 左上(内) · 右上(内) · 左下(内) · 右下(内)
-       .scr 396,124,807,613   .screen 396,124,807,613   .bezel 341,58,917,732
-     屏心摞了 11 层：div.face div.wtx div.win div.xp div.scr div.screen div.face …
-     ★ .scr **在**这一摞里
-     （window 收到 33 次 / 屏幕区收到 **0** 次，按相位 inside 31/0）
-
-   ⇒ **布局层完全正确**（`.scr` 的矩形罩住五个探测点、`elementsFromPoint` 里也有它），
-     坏的是**浏览器把命中判到了 `.scr` 的祖先身上**。而且它是**相位相关**的：
-     `ready` 相位好得很（他那台账里 `命中 btn 1`，说明远景下指针能走到窗口按钮上），
-     只有推进到 `inside` 之后才整个失灵。
-
-   ★ 上面 `add()` 里删掉 three.js 那条内联 `pointer-events` 是第一支修法（让外壳
-     真正让开，hit-test 的候选只剩 `.screen` 一棵子树）。但**本机四种视口 × 两档 dpr
-     一次都复现不出来**，所以那一支只能算"按证据推的"，他那边能不能好没人知道。
-     于是再加这一支：**不跟浏览器的判定讲道理，自己算。**
-
-   ★ 算法只用一条：`elementsFromPoint` 在 CSS3D 下的**整体顺序不可信**（3D 的 z 序是
-     投影之后才定的，而它按 CSS 层叠排），但**屏幕那一支内部的顺序是可信的** ——
-     那里面全是同一平面上的普通 2D 元素。他的台账就是证据：
-     `.wtx .win .xp .scr .screen`，记事本内容区压着窗口、窗口压着桌面，从顶到底一路正确。
-     所以取"第一个落在 `.screen` 子树里的"就是该点的真正目标。
-
-   ★ 只在**浏览器判定没进屏幕**、而几何判定进了的时候才动手 ⇒ 浏览器判对了就一个字节
-     都不碰（本机所有情况都走那条），判错了才补。两个计数分开记，`nRescue` 归零就说明
-     第一支修法治好了，这一支一次都没上岗。 */
+/* 几何回退只在浏览器目标不属于屏幕、而该点候选集合包含屏幕子树时启用。
+   CSS3D 的整体层序不可靠，屏幕内部为同平面 DOM，取该子树中第一个候选作为目标。
+   nRescue 独立计数，区分原生命中与回退命中。 */
 function geoTargetAt(x, y){
   var list;
   try { list = document.elementsFromPoint(x, y); } catch (err){ return null; }
@@ -1100,9 +832,8 @@ addEventListener('pointerdown', function(e){
   screenDown(t, e);
 }, true);
 
-/* 滚轮同一条道理：`.wtx` 的滚动是浏览器原生的，也要靠 hit-test 才找得到它。
-   用户原话「我在没放大的时候甚至可以滑里面的那个上下的那个东西」—— 放大后那东西
-   也一起失灵了。这里按几何把 deltaY 转交给 `.wtx`。 */
+/* 滚轮同一条道理：`.wtx` 的滚动是浏览器原生的，也要靠 hit-test 才找得到它
+   —— 放大后"滑里面那个上下的东西"也一起失灵了。这里按几何把 deltaY 转交给 `.wtx`。 */
 addEventListener('wheel', function(e){
   if (e.target && e.target.closest && e.target.closest('.screen')) return;
   if (phase !== 'inside') return;
@@ -1128,11 +859,7 @@ addEventListener('pointermove', function(e){
 
 addEventListener('pointerup', function(e){
   wdrag = null;
-  /* ★ 和上面 `goInside()` 同一条判据（< 7px 才算点击）：拖动松手时那几像素
-     抖动不该被当成"点了一下"。`pd` 存的是 **id 不是元素** —— 任务栏按钮
-     每次 sync 都会被重建，存元素等于存了个已经从 DOM 上摘下来的东西。
-     ★ `fired` 只给 `?dbg=1` 的台账用：`pd=null`（按下时没命中）、
-     `位移超 7px 丢掉`、`开了 xxx` 三种要能从屏幕上一眼分开。 */
+  /* 点击位移阈值为 7px。pd 存 id 而非节点，避免任务栏重建后引用失效；fired 用于调试。 */
   var fired = '（按下时没命中任何东西）';
   if (pd && (phase === 'inside' || phase === 'zoom')
       && Math.hypot(e.clientX - pd.x, e.clientY - pd.y) < 7){
@@ -1152,7 +879,7 @@ addEventListener('pointerup', function(e){
   pd = null;
 });
 
-/* 开局：第一个文件是开着的 —— 用户 2026-10-07 就要"默认打开了一个" */
+/* 开局：第一个文件是开着的 */
 FILES.forEach(function(f, i){
   if (i === 0){ WIN[f.id].open = true; WIN[f.id].z = topZ(); }
   sync(f.id);
@@ -1165,14 +892,8 @@ add(mkEl('top',  BW, BD), 0,  BH / 2, 0,  Math.PI / 2, 0);
 add(mkEl('top',  BW, BD), 0, -BH / 2, 0, -Math.PI / 2, 0);
 
 /* ── 相机 ─────────────────────────────────────────────────────── */
-/* 开场：给 yaw 一个**小的初速度**，靠阻尼滑停 —— 不再是从 `ORB_FROM` 转 2π 的过场。
-   ★ 2026-10-08 用户报「开局一个大旋转霸体」。原来 `ORB_DUR = 6.0` 转一整圈，
-     而那 6.9 秒里 `phase` 一直是 `'enter'` —— `goInside()` 头一行就是
-     `if (phase !== 'ready') return`，`pointerdown` 里的 `drag = …` 也要求 ready，
-     **两个入口同时被它挡着**。实测：2.5s 时点屏幕中心，事件确实送到了 `.wtx` 上
-     （`elementFromPoint` 给的就是它），只是进了闸就没了下文。
-     现在 `phase` 从第 0 帧起就是 `'ready'`：想进屏幕随时点得进，想拖随时拖得动。
-   位移 = V0/K（指数衰减的总行程），所以把起点往回推 `ORB_OFF`，**正好停在正面**。 */
+/* 开场从 ready 启动，允许立即点击和拖动。yaw 初速度指数衰减，
+   起点按总行程 V0/K 回推 ORB_OFF，使滑停后回到正面。 */
 var ORB_V0 = 1.1, ORB_K = 2.0;          // rad/s、1/s（τ=0.5s，约 2s 滑停）
 var ORB_OFF = ORB_V0 / ORB_K;           // 0.55 rad ≈ 31.5°，要转的总角度
 var ORB_FROM = -0.42;                   // 停下时的角度（就是原来的默认视角）
@@ -1186,21 +907,13 @@ var camPos  = new THREE.Vector3(0, 0, ORB_DIST);
 var camLook = new THREE.Vector3(0, 0, 0);
 var yaw = ORB_FROM - ORB_OFF, tgtYaw = yaw, tgtPitch = PITCH;
 var yawV = ORB_V0;                      // 开场动量；一拖动、或滑停就归零
-var phase = 'ready';                    // ★ 从第 0 帧起就能用（见上面 ORB_V0 那段）
+var phase = 'ready';                    // 从第 0 帧起就能用（见上面 ORB_V0 那段）
 var lastT = 0;                          // 上一帧的钟，用来算 dt（开场动量的衰减）
 var hintDone = false;                   // 开场那句提示只发一次（见 frame 里那段注释）
 var t0 = performance.now();
 
 function clamp(v,a,b){ return v < a ? a : v > b ? b : v; }
-/* ★ 帧率无关的阻尼系数：`p` 是"60fps 下每帧该走的比例"，返回这一帧该走的比例。
-   原来是 `lerp(tp, 0.07)` —— **每帧固定 7%，与 dt 无关**，于是镜头推进要走满 77 帧：
-   60fps 下 1.28 秒，10fps 下 7.7 秒。而 `phase` 从 `zoom` 翻到 `inside` 之前，
-   屏幕上**每一次点击都被丢掉**（`scrEl` 那条 `if (phase !== 'inside') return`）。
-   2026-10-08 实测（`_logs/_heroray.py` ⑥）：点屏幕后 0.05 / 0.25 / 0.50 / 0.90 秒
-   各点一次桌面图标，**四次全是"没反应"**；1.5 秒后才开。
-   用户报的就是这个：「屏幕放大了，但里面的图标 / 窗口 / 叉号点了没反应」。
-   ★ 60fps 下与原来**逐帧相等**（1−e^(−4.354/60) = 0.0700 = 原来的 0.07），
-   所以这不是调手感，只是把"按帧"换成"按秒"。同一坑见 handfeel.md §7。 */
+/* 阻尼按 dt 换算：将 60fps 下每帧比例 p 转为当前帧比例，避免低帧率延长推进时间。 */
 function damp(p, dt){
   if (p >= 1) return 1;                       /* `p=1` 是"一帧到位"，别走 log(0) */
   return 1 - Math.exp(Math.log(1 - p) * 60 * dt);
@@ -1221,9 +934,7 @@ function syncPower(){
   el.setAttribute('aria-disabled', phase === 'back' ? 'true' : 'false');
 }
 
-/* 外壳 pointer-events 必须继续让开屏幕，所以背景不能靠 DOM 的命中来猜。
-   投影机身包围盒和前凸台阶的真实角点，求凸包；屏幕/窗口另行排除。
-   投影轮廓取保守的外边界：圆角附近不误把机身当背景。 */
+/* 背景判定使用投影机身角点凸包，另行排除屏幕与窗口；不用外壳 DOM 命中作为边界。 */
 function bodyHull(){
   var points = [], v = new THREE.Vector3();
   [[-BW/2,BW/2,-BH/2,BH/2,-BD/2,BD/2],
@@ -1286,7 +997,7 @@ addEventListener('pointerdown', function(e){
     return;
   }
   if (phase !== 'ready' || (e.target.closest && e.target.closest('#esc'))) return;
-  yawV = 0;                       // ★ 手一按，开场动量立刻让位（按住不放也不跟人抢）
+  yawV = 0;                       // 手一按，开场动量立刻让位（按住不放也不跟人抢）
   down = { id:e.pointerId, x:e.clientX, y:e.clientY };
   if (!(e.target.closest && e.target.closest('.screen')))
     drag = { x:e.clientX, y:e.clientY, y0:tgtYaw, p0:tgtPitch };
@@ -1295,16 +1006,7 @@ addEventListener('pointermove', function(e){
   if (backgroundDown && e.pointerId === backgroundDown.id
       && Math.hypot(e.clientX-backgroundDown.x,e.clientY-backgroundDown.y)>=7) backgroundDown=null;
   if (!drag) return;
-  /* ★ 两个减号就是"方向对了"的全部内容，2026-10-08 修的。
-     原来是 `+`，用户原话：「你那个开发室的电脑拖拽方向应该全反了」。
-     为什么 `+` 是反的，看 orbitPos（上面 434 行）：
-       相机 x = sin(yaw)·d，y = −sin(pitch)·d
-     右拖 dx>0 → `yaw` 增 → 相机往右绕 → **画面往左走**，手感像在推一堵墙。
-     要的是"手抓住机器往右拽" ⇒ 机器正面朝右 ⇒ 相机往**左**绕 ⇒ yaw 减。
-     下拖同理：`pitch` 增 ⇒ 相机 y 减（往下）⇒ 看到**底面**；手往下拽要看到顶面。
-     同一个坑 `town.html:3628` 已经付过一次学费（「原来写的是 yaw0 + dx*K，
-     手感像在推一堵墙」），这里是把它抄过来的第二条。
-     ★ 灵敏度（0.0075 / 0.0045）没动，只翻了号 —— 手感是另一件事，等出图再调。 */
+  /* yaw/pitch 按拖动差值取负，使机身随手移动；灵敏度分别为 .0075/.0045。 */
   tgtYaw   = drag.y0 - (e.clientX - drag.x) * 0.0075;
   tgtPitch = clamp(drag.p0 - (e.clientY - drag.y) * 0.0045, -0.7, 0.7);
 });
@@ -1322,10 +1024,7 @@ addEventListener('pointerup', function(e){
 addEventListener('pointercancel', function(){pd=null;wdrag=null;down=null;drag=null;backgroundDown=null;});
 addEventListener('blur', function(){pd=null;wdrag=null;down=null;drag=null;backgroundDown=null;});
 addEventListener('keydown', function(e){ if (e.key === 'Escape' && !e.repeat) onEsc(); });
-/* 左上角那个标记也能点 —— 用户只说"有个 ESC"，但鼠标用户会去戳它。
-   ★ 它还是**最可靠的那个退出口**：这一页挂进 iframe 后，焦点在父页时
-     它自己的 `keydown` 收不到（ESC 得靠父页转发，见文件末尾）。
-     DOM 点击不依赖焦点，所以"一进来什么都没点就想退"走这个。 */
+/* 左上退出标记提供不依赖键盘焦点的退出入口；iframe 内的 Esc 还可由父页转发。 */
 var escEl = document.getElementById('esc');
 escEl.addEventListener('click', onEsc);
 /* 原生 button 自带 Enter/Space 激活，不能再手动补一遍。 */
@@ -1345,42 +1044,20 @@ var stage = document.getElementById('stage');
 var _v = new THREE.Vector3(), _z = new THREE.Vector3(0, 0, 0);
 
 function frame(now){
-  /* 闸：每帧把钟的原点推到**当下** —— 等价于 t 恒为 0，而下面照常渲染第 0 帧。
-     ★ 不能写成 `if (GATE) return;`：那是"不画"，解冻那一刻会先空一拍再蹦出来，
-       而闸的整个意义就是"解冻前后连着"（上一帧就是解冻后的第一帧）。
-     代价：闸期间这一页仍然每帧渲染。可见的只有一台静止的机器，rAF 很便宜。 */
+  /* GATE 期间每帧重置时钟原点并渲染第 0 帧，不直接 return，以保持解冻连续。 */
   if (GATE) t0 = now;
   var t = PIN.t !== null ? PIN.t : (now - t0) / 1000;
-  /* 开场动量用**帧率无关**的指数衰减（同画廊那条 `v *= exp(-K*dt)`）。
-     ★ 闸期间 `dt` 必须为 0 —— `if (GATE) return` 那种写法不能用（解冻会空一拍，
-       而闸的意义就是"解冻前后连着"），但也不能让闸期间镜头自己转起来，
-       那就不叫"冻在入场第 0 帧"了。 */
+  /* 开场动量按指数衰减，GATE 期间 dt=0，冻结相机入场。 */
   var dtRaw = Math.min((now - lastT) / 1000, 0.05);
   lastT = now;
   var dt = GATE ? 0 : dtRaw;
-  /* ★★ `dtRaw` 是给**镜头推进**用的，不吃闸（2026-10-08 补）。
-     闸把 `dt` 归零，冻的是**入场**（开场动量 + 淡入钟）—— 那是对的。
-     但 `goInside()` 是**用户点的**，不是入场的一部分：旧的 `lerp(tp, 0.07)`
-     不看 dt，所以"闸期间点屏幕"照样推得进去；我把它换成 `damp(p, dt)` 之后
-     `damp(p, 0) === 0`，**镜头一步不走**，phase 永远卡在 `'zoom'`。
-     这不是新 bug，是我引进的**不对称**。
-     `_logs/_gateclick.py` 量到的：带闸点屏幕，`.scr` 宽 7 秒恒 **265** 不动；
-     不带闸同一条路 233 → 695 → 856 → 858，三秒进 `inside`。
-     ★ 用 `dtRaw` 是安全的：下面那个 lerp 块只在 `zoom/inside/back` 里跑，
-       而闸期间不点屏幕就只可能是 `ready`（走 else 那支，仍然吃 `dt=0`，照旧冻着）。 */
+  /* dtRaw 不受 GATE 影响，用于用户触发的 zoom/inside/back 相机推进；
+       入场动量仍使用受闸控制的 dt，避免点击后停在 zoom。 */
 
-  /* ★ 淡入**提到分支外面**：原来它写在 else 里，而 `goInside()` 之后 phase 变
-     `'zoom'`、走的是 if 那支 —— 于是"头 0.9 秒内点进去"会让 `#stage` 永远拿不到
-     `on`（opacity 恒 0，推进去了却什么都看不见）。现在两支都判得到它。 */
+  /* 淡入放在相位分支外，确保早期点击进入 zoom 后仍能显示 stage。 */
   if (PIN.yaw === null && t > LEAD){
     stage.classList.add('on');
-    /* ★ 这句提示原来是"转完一圈"（6.9 秒）那一刻才弹的 —— 现在**第 0 帧就能点、
-       能拖**，提示就该在淡入完成时出现。和 `on` 同一条件，两者一起亮。
-       藏着不说，用户只会以为"点不动"（他就是这么报的）。
-       ★★ 但必须**只发一次**（`hintDone`）。这一块**每帧都跑**，而第二级 Esc 会把
-       HUD 改成「退出…」时 `phase` 仍停在 `ready` —— 不设标志的话那一句当场被
-       覆盖回「点击屏幕」，用户看到的是"按了 Esc 什么都不发生"。
-       这是 `_deskgate.py` ⑤ / `_deskwin.py` ④ 抓出来的（两条同时红）。 */
+    /* 淡入完成时提示可点击/拖动，仅由 hintDone 发一次，避免覆盖后续 Esc 的退出提示。 */
     if (phase === 'ready' && !hintDone){ hintDone = true; setHud('[system] 点击屏幕 · 拖动旋转'); }
   }
 
@@ -1400,9 +1077,7 @@ function frame(now){
       phase = 'ready'; syncPower(); setHud('[system] 点击屏幕 · 拖动旋转');
     }
   } else {
-    /* 开场动量：推进 tgtYaw，速度指数衰减；滑停就撒手，之后只由拖动写。
-       ★ 停下时把 tgtYaw 钉回 `ORB_FROM`，不留那点残差 —— 否则每次开场的落地
-         角度都差几毫弧度，而那个角度是设计好的默认视角。 */
+    /* 开场速度衰减结束后将 tgtYaw 固定回 ORB_FROM，消除数值残差。 */
     if (PIN.yaw === null && yawV !== 0){
       tgtYaw += yawV * dt;
       yawV *= Math.exp(-ORB_K * dt);
@@ -1421,14 +1096,13 @@ function frame(now){
   camera.lookAt(camLook);
   renderer.render(scene, camera);
 
-  /* ★ 几何普查：每 0.5 秒问一次"这几个点上站的是谁"。
+  /* 几何普查：每 0.5 秒问一次"这几个点上站的是谁"。
      不敢每帧跑 —— `elementFromPoint` 会强制布局，而这页每帧主线程只有 ~2ms。 */
   if (DBGON && (phase === 'inside' || phase === 'ready') && now - lastCensus > 500){
     lastCensus = now; runCensus();
   }
 
-  /* 读数盒子：`?dbg=1` / `?probe` 才开（定义见文件末尾，三条定格路强制关）。
-     ★★ 2026-10-09 收工：第四报修好之后这里**改回默认关**，理由与做法见末尾那段注释。 */
+  /* 读数盒子：`?dbg=1` / `?probe` 才开（定义见文件末尾，三条定格路强制关）。 */
   if (DBGON){
     dbg.textContent = 'phase ' + phase + '   t ' + t.toFixed(2) + '  yaw '
       + (yaw * 180 / Math.PI % 360).toFixed(1) + '°\n机身 ' + BW + '×' + BH + '×' + BD
@@ -1436,20 +1110,20 @@ function frame(now){
       + (innerWidth === W && innerHeight === H
          ? '' : '   ★?w=&h= 传的 ' + W + '×' + H + ' 与视口不符')
       + '   errs ' + (window.__errs || []).length
-      /* ★★ 两级计数 —— 这一行是给"像个图片"定性的那一行：
+      /* 两级计数 —— 这一行是给"像个图片"定性的那一行：
          window 涨而 .scr 不涨 ⇒ 有东西盖在屏幕上；两个都不涨 ⇒ 事件没进这一页。 */
       + '\n指针：window 收到 ' + nWin + ' 次 / 屏幕区收到 ' + nScr + ' 次'
-      /* ★ 2026-10-09：兜底层上岗了几次。**这个数归零 = 第一支修法就够了**，
+      /* 兜底层上岗了几次。这个数归零 = 第一支修法就够了，
          非零 = 浏览器判定仍然进不了屏幕、靠几何补的。两支谁在干活，看这个数。 */
       + (nRescue ? '   ★几何兜底补了 ' + nRescue + ' 次' : '')
       + (lastWin ? '   最近 ' + lastWin + ' → ' + lastNear : '')
-      /* ★ 按相位分：`ready` 下屏幕只有 235×209，点在机身/空白上就是"只到 window"
+      /* 按相位分：`ready` 下屏幕只有 235×209，点在机身/空白上就是"只到 window"
          —— 光看总量会把这种和"被盖住"混成一谈。 */
       + '\n  按相位（window/屏幕区） ' + fmtTap()
-      /* ★★ 按命中对象分 —— 这一条是决定性的：**没有 `ic` 就说明从来没有一次
-         点击落在图标上**，那不是"点不动"，是"瞄的不是那儿"。 */
+      /* 按命中对象分 —— 这一条是决定性的：没有 `ic` 就说明从来没有一次点击落在图标上，
+         那不是"点不动"，是"瞄的不是那儿"。 */
       + '\n  命中 ' + fmtHit()
-      /* ★ 几何普查（每 0.5 秒刷一次，见 `runCensus`）。`ready` 与 `inside`
+      /* 几何普查（每 0.5 秒刷一次，见 `runCensus`）。`ready` 与 `inside`
          两个相位都印 —— 两个读数一比，差的就是相机位置那点事。 */
       + (census ? '\n几何普查 ' + census : '')
       /* 台账跟着 `PIN.dbg` 走（`?d=0` 时也印 —— 那一栏正是要看的东西） */
@@ -1476,15 +1150,8 @@ if (PIN.go){
   yawV = 0; tgtYaw = ORB_FROM; yaw = ORB_FROM;
   orbitPos(ORB_FROM, PITCH, ORB_DIST, camPos);
 }
-/* 读数盒子：默认藏，`?probe` 或 `?dbg=1` 才开（约定同镇子那三个样张页）。
-   ★ 藏起来**不影响探针** —— `display:none` 的元素 `textContent` 照常读得到。
-   ★ 三条定格路（`?go=` / `?yaw=` / `?t=`）**一律强制关**，且这条要在最前面：
-     探针拍终态时经常 `?go=1&dbg=1` 一起给，不排除就会把这块绿字拍进交付图。
-     （`textContent` 照读，所以那几条路的判据一点不受影响。）
-   ★★ 2026-10-09 收工：第四报（hit-test 被 three.js 那条**内联** `pointer-events`
-     截获）确认修好之后，这里从"诊断期默认打开"**改回默认关**。当时默认打开是因为他走
-     「正页 → 小镇 → 开发室」、`desk.html` 的 URL 由 `town.html` 的 `SCENE_SRC.dev` 拼，
-     他在地址栏够不着。以后要在开发室里看台账，把 `?dbg=1` 从父页一路传下来，或单开这一页。 */
+/* 读数盒默认隐藏，?probe 或 ?dbg=1 开启；?go/?yaw/?t 定格优先强制隐藏。
+   隐藏时仍可读取 textContent。 */
 var DBGON = (PIN.go || PIN.yaw !== null || PIN.t !== null)
           ? false : !!(PIN.dbg || Q.has('probe'));
 dbg.style.display = DBGON ? 'block' : 'none';
@@ -1495,20 +1162,8 @@ requestAnimationFrame(frame);
 window.__errs = [];
 addEventListener('error', function(e){ window.__errs.push(String(e.message) + '@' + e.lineno); });
 
-/* ── 跨文档：这一页是给父页（`town.html`）挂进 iframe 用的 ─────────────
-   和井（`fx-throw.html`）走**同一套暗号**，父页那边不用为它分叉：
-     well-hello  报到。父页拿它当"真的建好并跑起来了"的**硬判据** ——
-                 iframe 的盒子有尺寸完全可能是里面一片空白。
-     well-go     父页放行 → 解上面那个 GATE（幕开始让开的那一刻发）。
-     well-esc    父页**转发** Escape 进来。这一条是必需的：焦点在父页时，
-                 这一页自己的 `keydown` 收不到任何键 —— 而"一进来什么都
-                 没点就先按 Esc"恰恰是焦点在父页的。
-     well-exit   我这边要退（点了左上角 ESC 标记 / 按了键盘 Esc / 焦点在
-                 这一页时按的 Esc）。父页收到就调它的 `sceneExit()`。
-   ⚠ 父页那头**不能拿 `e.origin` 当门**：file:// 下它是不透明的，认不出自己人。
-     一律用消息里的 `what` 字段认。
-   ⚠ 单独打开时 `parent === window`，消息会发给自己。加守卫，否则
-     "点 ESC 往自己耳朵里喊一声"（无害但是脏）。 */
+/* 父子页消息：well-hello 报到，well-go 解闸，well-esc 转发退出键，well-exit 请求返回。
+   按 what 字段识别，file:// 不依赖 origin；单独打开时不向自身发消息。 */
 function wellSay(what){
   if (window.parent && window.parent !== window)
     window.parent.postMessage({ what: what }, '*');
@@ -1524,20 +1179,14 @@ requestAnimationFrame(function(){ requestAnimationFrame(function(){
   wellSay('well-hello');
 }); });
 
-/* ── 探针 ──────────────────────────────────────────────────────────
-   出图一律先挂 `__errs`（规矩），这一页自己那份在上面。
-   `gate` / `t` 是"闸到底冻住没有"的**硬判据** —— 光看图分不出"冻在第 0 帧"
-   和"刚好转到那个角度"，而 `t` 恒在 0 附近才说明 it 真的没走。
-   `aspect` 是 `?w=&h=` 有没有生效的那个数（NaN 或 0 就是没接到尺寸）。 */
+/* gate/t 验证时钟冻结，aspect 验证父页尺寸是否传入；__errs 收集运行错误。 */
 window.__deskProbe = {
   state: function(){
     return { phase: phase,
              t: +((PIN.t !== null ? PIN.t : (performance.now() - t0) / 1000)).toFixed(2),
              gate: GATE, w: W, h: H, aspect: +(W / H).toFixed(4),
              yaw: +(yaw * 180 / Math.PI % 360).toFixed(1),
-             /* ★ 要判"往哪边转"必须用下面这两个**不取模**的，不能用上面那个：
-                左拖时 335.9° → 387.5°，取模回来是 27.5° —— 比 335.9 还**小**，
-                判据会整个反过来，而且看着还挺像回事。写探针时踩到过。 */
+             /* 用未取模的角度比较旋转方向，避免跨 360° 时误判正负。 */
              yawDeg:   +(yaw * 180 / Math.PI).toFixed(2),
              pitchDeg: +(tgtPitch * 180 / Math.PI).toFixed(2),
              esc: !!document.getElementById('esc'),
@@ -1547,9 +1196,7 @@ window.__deskProbe = {
              hud: hud.textContent,
              errs: (window.__errs || []).length };
   },
-  /* 窗口：**状态**和 **DOM 上实际的样子**两样都给。只给状态就查不出
-     "状态对了但没画出来"（sync 漏了一处 / 被 CSS 覆盖）—— 那正是这一轮
-     最容易出的错。`rw/rh/rx/ry` 是元素在页面上的真实矩形（含 CSS3D 的缩放）。 */
+  /* 窗口探针同时返回状态与 DOM 实际矩形；rw/rh/rx/ry 包含 CSS3D 缩放。 */
   wins: function(){
     var out = {}, top = null, tz = -1;
     FILES.forEach(function(f){

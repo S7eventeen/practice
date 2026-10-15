@@ -3,21 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>S7EVENTEEN</title>
-<!-- ── 这个文件只是**入口的路标**，本身不是网页 ──────────────────────
-     真正的主页在 proto/ref-hero.html。它必须留在 proto/ 里 —— 那一整套
-     页面靠**相对路径**互相找（ref-hero 挂同目录的 town.html，游戏厅那面
-     墙再去 ../assets/wall/ 取照片）。把它挪到最外层，这些路径会一起断。
-
-     ★ 这个 `index.html` 是 2026-10-15 为**部署到线上**加的：托管平台在
-       根路径 `/` 上找的就是它，没有它根路径会 404。它和同目录的
-       `点击打开网页.html`（那个是给**解压后双击**用的）跳的是同一个地方，
-       两份都在，各管一条路。
-
-     下面两条跳转**都留着**（meta refresh 和脚本），谁先生效都行，跳的是
-     同一个地方；脚本用 replace 是为了**不留下这一页在后退历史里** ——
-     否则用户按后退会回到这里、又被立刻弹回去，等于退不出去。
-
-     ★ 改了 proto/ 里主页的位置，这里和 `点击打开网页.html` 都要跟着改。 -->
+<!-- 跳转到正式主页；保留 proto 与 assets 的相对位置。 -->
 <meta http-equiv="refresh" content="0; url=proto/ref-hero.html">
 <style>
   html, body { height: 100%; margin: 0; }

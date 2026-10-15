@@ -9,30 +9,16 @@
             font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
   #cv{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
   #cv.drag{cursor:grabbing}
-  /* ★ 默认**不显示**（`display:none`）—— 这堆读数是给开发和探针看的，
-     不是页面内容。`?probe` 才开，和 `town.html` / `street.html` / `break.html` 同一条约定。
+  /* 默认不显示（`display:none`）—— 这堆读数是给开发和探针看的，不是页面内容。
+     `?probe` 才开，和 `town.html` / `street.html` / `break.html` 同一条约定。
      这一页原来一直挂着它（本来是样张页），可它现在已经从书店接进正页了。 */
   #hud{position:fixed;left:10px;bottom:10px;color:#8FA3B8;
        font:12px/1.45 ui-monospace,Consolas,monospace;background:#0B1017cc;
        padding:6px 9px;border-radius:6px;white-space:pre;pointer-events:none;
        display:none}
 
-  /* ── 井口的「出口」────────────────────────────────────────────────
-     位置**不写在 CSS 里**，由 placeExit() 按 VP（消失点）摆 —— 消失点是
-     W/H 的函数，换个窗口大小它就挪，写死在 CSS 里必然对不上。
-
-     ★ 2026-10-07 用户：「出口的字换成黑色」。原来是小镇的暖黄 `C.warm`
-     （屋里那盏灯的颜色），是井里**第三个**颜色（红底 / 近黑的字 / 暖黄的它）。
-     改成和井里那些字同一个近黑 #150001 —— 压在 #F40B3E 上对比度 4.96:1，
-     12px 点阵够读（暖黄那版是 8.7:1，所以是**用户要的样子**换来的，不是漏判）。
-
-     text-shadow 收成 1px 近黑描边，不让灭点旁多出一圈糊晕。
-     hover 仍只亮字，键盘 focus 则用细轮廓明确标出；中心仍钉在 VP。
-
-     ⚠ font-size 必须是 12 的整数倍：Zpix 是 12px 点阵，非整数倍时顶点落在
-     半像素上、点阵被插值糊掉（`font-weight` 同理，Zpix 没有粗体）。
-     ⚠ 这一页没有 `#chat,#chat *` 那条全局规则，font-family 必须在这里写全
-     —— 只写 'Zpix' 不给兜底链，缺字时是静默回退到系统字体。 */
+  /* 出口由 placeExit() 对齐 VP，使用近黑像素字与 1px 硬阴影。
+       字号为 12 的整数倍、常规字重，并声明完整 Zpix 兜底链；focus 提供轮廓。 */
   #exit{position:fixed;left:0;top:0;transform:translate(-50%,-50%);
         font-family:'Zpix',ui-monospace,'Cascadia Mono','Consolas',monospace;
         font-size:12px;line-height:1;font-weight:400;
@@ -43,33 +29,13 @@
   #exit:focus-visible{color:#FFF6DC;outline:1px solid #150001;outline-offset:2px}
   #exit:active{color:#150001}
 
-  /* ── 拿起的纸：第二张 canvas ────────────────────────────────────────
-     它只画**被手拿起过**的纸（face>0 或 held），放在 `#exit` **之后** —— 于是
-     纸压着「出口」（用户 2026-10-07：「图层要在拿起的纸之下」）。
-     井里那些没被碰过的纸照旧画在主 canvas 上（在井里那几行字之前，被字压着）：
-     它们属于场景，而拿起来的那张已经成了手上的东西，两者本来就不是一层。
-
-     ★ `position:fixed` 是**必须**的，不是为了铺满：`#cv` 是普通流里的块
-     （width/height 100%），多一张同级的流内元素会把它挤成一半高。
-       fixed 让它脱离流，`#cv` 照旧铺满整个视口。
-     ★ `pointer-events:none` 同样是**必须**的：这张层盖住了整个画面，
-       不关掉事件的话底下 `#cv` 再也收不到 pointerdown —— 整页拖不动，
-       而症状极像"纸的命中判定坏了"（这个项目在 town.html 上刚栽过一次
-       同类的：hover 正常、点不动）。 */
+  /* #cvup 仅绘制 face>0 或 held 的纸，层序高于出口。
+       fixed 避免挤压主 canvas，pointer-events:none 保留底层拖动。 */
   #cvup{position:fixed;left:0;top:0;width:100%;height:100%;
         display:block;pointer-events:none}
-  /* ── 像素字 ──────────────────────────────────────────────────────────
-     Zpix（最像素）3.3.0。整包 944 KB，按本页用到的 160 字裁完 5.7 KB 内嵌。
-     ★ 这行里的两个数由 `scripts/pix-subset.py` 维护，**别手改** ——
-     手写的数字没人记得跟着改，早晚变成谎话。
-
-     这一页本来一个 Zpix 的字都没有（整页是 canvas 画的），是为了井口那个
-     「出口」才内联的 —— 所以子集只要重新裁一次就能瘦到很小。
-     12px 不是随手挑的：Zpix 是 12px 点阵，字号必须是 12 的整数倍，
-     非整数倍时顶点落在半像素上、点阵被插值糊掉。
-     ⚠ 缺字是**静默回退**：CSS 一字不错、读代码查不出来，混排出来是
-     一半点阵一半平滑，第一眼只会当成"像素字体没生效"。
-     **改了这一页的文案就要重跑 `scripts/pix-subset.py --page proto/fx-throw.html`。** */
+  /* Zpix 3.3.0 为出口提供 12px 点阵字，字号须为整数倍。
+       整包 944 KB，按本页用到的 160 字裁完 5.7 KB 内嵌。
+       改文案后重跑 scripts/pix-subset.py --page proto/fx-throw.html，统计由脚本维护。 */
   @font-face{font-family:'Zpix';font-style:normal;font-weight:400;font-display:block;
              src:url(data:font/woff2;base64,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) format('woff2')}
 </style>
@@ -78,9 +44,9 @@
 <canvas id="cv"></canvas>
 <div id="hud"></div>
 <!-- 井口那个「出口」。位置由 placeExit() 摆（理由见上面 CSS 那段），点它 = 回小镇。
-     放在 canvas **之后**是必须的：canvas 铺满全屏且不透明，放前面会被它整个盖住。 -->
+     放在 canvas 之后是必须的：canvas 铺满全屏且不透明，放前面会被它整个盖住。 -->
 <div id="exit" role="button" tabindex="0" aria-label="出口">出口</div>
-<!-- 拿起的纸。**必须放在 #exit 之后** —— DOM 顺序就是图层顺序，放在前面纸就被
+<!-- 拿起的纸。必须放在 #exit 之后 —— DOM 顺序就是图层顺序，放在前面纸就被
      「出口」压住了（见上面 #cvup 那段注释）。它 pointer-events:none，不挡鼠标。 -->
 <canvas id="cvup"></canvas>
 <script>
@@ -98,41 +64,41 @@ var C = {
   warm:"#FFC95F", glow:"#FFBE63",
   stone:"#9FAFC0", line:"#22303F",
   roofRed:"#C4503F", roofBlue:"#3E6291", roofGreen:"#4F7A55","roofPurple":"#7A5A9E",
-  /* 书。封面走小镇那套蓝绿紫 —— **不能是红的**：井底就是一片鲜红，红封面的书
+  /* 书。封面走小镇那套蓝绿紫 —— 不能是红的：井底就是一片鲜红，红封面的书
      会整个化在背景里，只剩书口那叠白纸看得见。书页用小镇的纸色，跟明信片同一个。 */
   cover:"#2E4A6E", coverDark:"#1E3252", spine:"#141F33",
   gold:"#E8C77A", pageC:"#F0E1C6", pageEdge:"#C9B492",
-  /* 井壁上那张纸。比 pageC 更白一档 —— 用户原话是"白色的纸"，而 pageC 是
+  /* 井壁上那张纸。比 pageC 更白一档 —— 要的是"白色的纸"，而 pageC 是
      书的纸页色（偏米），压在鲜红底上会显脏。 */
   paper:"#F4F1E8"
 };
 
-/* parseFloat("0") || 0.32 会得到 0.32 —— **0 是 falsy**，所以凡是能取 0 的参数
+/* parseFloat("0") || 0.32 会得到 0.32 —— 0 是 falsy，所以凡是能取 0 的参数
    都不能用 || 兜底，会变成"关不掉"。下面所有参数一律走 num()。 */
 function num(k, d){ var v = parseFloat(Q.get(k)); return isFinite(v) ? v : d; }
 
 var P = {
-  /* 同时在场几张。用户 2026-10-07：「同时会有两三张这样子」—— 原片里也是 2~3。 */
+  /* 同时在场几张。要的是"同时会有两三张"—— 原片里也是 2~3。 */
   n:     num("n", 4)|0,
   persp: num("persp", 900),
   /* 书的重力。900（照着"从画面外往下扔"定的）→ 80 → 20，一路降下来是同一件事
-     反复咬人：这条轨迹要把 y 的世界位移乘上**从 0.27 涨到 3 的 k**。80 在 3.7 秒
-     里攒出的那点位移（0.5·80·13.7 ≈ 550）会被放大成 1650px，书从灭点一路砸到
+     反复咬人：这条轨迹要把 y 的世界位移乘上从 0.27 涨到 3 的 k。80 在 3.7 秒里
+     攒出的那点位移（0.5·80·13.7 ≈ 550）会被放大成 1650px，书从灭点一路砸到
      画面正下方 —— 而正下方是那四行字，穿过去就是"砸在字上"。
-     "落向我们"里的"落"是**朝我们**，由 k 变大来演；重力只负责让它别走得笔直。
+     "落向我们"里的"落"是朝我们，由 k 变大来演；重力只负责让它别走得笔直。
      20 够当那点扰动。 */
   grav:  num("grav",   20),   // px/s²
-  /* 出生时的**向上**初速（世界单位/秒）。书要往上、往两边散 —— 往下是字的领地。
+  /* 出生时的向上初速（世界单位/秒）。书要往上、往两边散 —— 往下是字的领地。
      同样受 k 放大支配，所以这个数看着不小、落到屏幕上刚好是灭点上方一百多像素。 */
   svy:   num("svy",    90),
-  /* 出生时的**横向**初速（世界单位/秒）。这条是"别挡住视线"的主力：书正对着
+  /* 出生时的横向初速（世界单位/秒）。这条是"别挡住视线"的主力：书正对着
      观众飞过来会越变越大，最后糊在画面正中——那正是井和字待的地方。让它从井口
      一出来就斜着走，等它长大到显眼的时候，人已经在画面边上了。
-     ★ 380 这个数是量出来的，不是估的：_logs/_bkpos.py 报过 220 配 drag=0.7 时
-     书飞到 k=3.04（屏盒 647×592、离灭点只有 83px）—— 那是"糊在正中间"的本体。 */
+     380 不是估的：_logs/_bkpos.py 报过 220 配 drag=0.7 时书飞到 k=3.04
+     （屏盒 647×592、离灭点只有 83px）—— 那是"糊在正中间"的本体。 */
   svx:   num("svx",   380),
   drag:  num("drag",  0.7),   // 空气阻力系数
-  /* 横向阻力**单独一个**，比 drag 小得多（见 step 里 vx/vy 那两行）。
+  /* 横向阻力单独一个，比 drag 小得多（见 step 里 vx/vy 那两行）。
      起因：drag=0.7 时横向位移的上限只有 vx/drag，220/0.7=314 —— 而书要偏出
      灭点 720px 才算出画。阻力把横向初速吃光了，vx 给多大都白搭。
      竖直方向保留原来的 drag：书往上飘要"飘"的感觉，横着走要"飞出去"。 */
@@ -140,7 +106,7 @@ var P = {
   follow:num("follow",20),    // 跟手强度（1/s）
   auto:  Q.get("auto") === "1",
 
-  /* ── 井（背景）── 默认值全部来自原片实测，量法见 _logs/_fxt_ref.py */
+  /* ── 井（背景）── 默认值全部取自原片，量法见 _logs/_fxt_ref.py */
   vpw:   num("vpw",  0.500),  // 消失点的横向位置（画面比例）
   vph:   num("vph",  0.356),  // 消失点的纵向位置 —— 原片 256/720
   rays:  num("rays", 96)|0,   // 棱线（井壁的经线）条数
@@ -151,7 +117,7 @@ var P = {
   pages: num("pages",  4)|0,  // 书口纸页的层线数。0 = 不画
   /* ── 纸：井壁上的一块楔形 ──────────────────────────────────────
      `paper=1`（默认）走这套，`paper=0` 回到旧的 3D 书。两套并存只为了能出对比图
-     —— 用户认可白纸之后，书那一套（Card / drawCard / coverArt / pages /
+     —— 白纸那套认可之后，书那一套（Card / drawCard / coverArt / pages /
      spineArt / BOOKS / 键 B / 拖拽）连同这个开关一起删。 */
   paper: num("paper",   1)|0,
   pSpan: num("pSpan",   6)|0,  // 梯形跨几条棱线 —— 左右两条边就落在棱线上
@@ -159,58 +125,31 @@ var P = {
   pGrow: num("pGrow", 0.55),   // ② 在井口展开成整条梯形用多久（秒）
   pLen:  num("pLen",   150),   // 梯形沿半径的长度（px）
   pSpd:  num("pSpd",   165),   // ③ 整体往外滑的速度（px/s）
-  /* 纸的角宽 = 跨的棱线角宽 × 这个系数。**1.0 才是对的** ——
-     那两条边正好落在第 i 与第 i+span 条棱线上，就是用户说的"被某两条黑线约束"。
-     ★ 纸边离棱线中心**多少像素**（正 = 纸比棱线窄，棱线完整地露在纸外）。
-     2026-10-07 用户第三次纠这一处：「纸边缘怎么上面有黑线，你是对不齐吗」。
-     前两版都不对：0.90（按比例收，缝有 5px）被否「边界不在黑线上」；
-     1.00（纸边压在棱线中心）纸外只剩半条线，被抗锯齿摊成比周围 95 条淡得多的
-     痕迹，再往纸内 2px 补一条 —— 那条补的线看着就是"给纸描的边"，出纸就断。
-     正解是**让纸窄一点点**：棱线完整留在纸外（跟其它 95 条一模一样、连着背景
-     一直连到画面外），纸边紧贴着它。这样"纸被两条棱线夹住"才成立。
-     1.2 是**纸中段**的量；同一角度在 r0 和 r1 处的像素偏移不同，所以按 rmid
-     换算，整条边看上去才是平行贴着线的。 */
+  /* 纸角宽沿用两棱线跨度，按中段半径将纸边内收 pEdge 像素，保持两侧棱线完整可见。 */
   pEdge: num("pEdge", 1.2),
-  /* ── 下面的参数是"消散"和"拖拽"这两件事的（2026-10-07 加）──────────
-     用户原话：「纸的那个拉扯过来啊、消散啊的效果做一下，之前应该做过的」。
-     "之前做过的"指的是书那套的 pointerdown→跟手→松手（书现在被 P.paper
-     切掉了，但那套代码还在）。"消散"来自原片：卡片不是淡出，是几团红斑
-     从边缘啃进来晕开，字幕念的是「晕染消失的效果」。 */
+  /* ── 下面的参数是"消散"和"拖拽"这两件事的 ──────────────────────────
+     "拖拽"指书那套的 pointerdown→跟手→松手（书现在被 P.paper 切掉了，
+     但那套代码还在）。"消散"来自原片：卡片不是淡出，是几团红斑从边缘
+     啃进来晕开，字幕念的是「晕染消失的效果」。 */
   die:   num("die",   0.55),  // 晕染消散用多久（秒）—— 不是淡出，见 dsInit
   pfol:  num("pfol",    14),  // 拖起来之后纸跟手的强度（1/s），屏幕坐标上的指数滤波。
                               // 跟书那个 P.follow 分开：书在 3D 里追 x/y，纸这里追的是
                               // 屏幕位置，共用会互相牵制
-  /* 转正速度（1/s）：按住后，纸从"贴在井壁上的斜梯形"变成"正对我们的一张纸"
-     要多久。12 ≈ 0.2 秒转完。
-     ★ 用户 2026-10-07 纠的正是这一条：「拉拽过来是变为正对着我们的纸」。
-     上一版让它在**极坐标里**跟着手挪（改 th 和径向偏移），读起来就是"在井壁上
-     滑"，永远是一张斜的梯形 —— 没有"被拉到前面来"这回事。原片那句字幕是
-     「它就会移动到我们的屏幕前面」，移到前面 = 转正。 */
+  /* 按住后以 12/s 转正，约 .2 秒完成；位置在屏幕空间跟手。 */
   pFace: num("pface",   12),
-  /* 转正后放大的倍数。★ 用户 2026-10-07 追加：「是正到横平竖直，还要放大些，
-     因为我要在上面放我的文字段落」——
-     这一句改了这张纸的**性质**：它不再是"从井里飘出来的一张纸"，而是内容载体。
+  /* 转正后放大的倍数。这一条改了这张纸的性质："正到横平竖直，还要放大些，
+     因为要在上面放文字段落"—— 它不再是"从井里飘出来的一张纸"，而是内容载体。
      所以尺寸按"能不能排下一个段落"定（fw×3.4 ≈ 376px 宽，比例 ≈ A4），
      不按井里的透视走。转正和放大一起挂在 face 上：被拉近本来就该同时变正变大。 */
   pZoom: num("pzoom", 3.4),
-  /* 拉扯：位置滤波的**滞后量**到多少像素算"拉到头"。
+  /* 拉扯：位置滤波的滞后量到多少像素算"拉到头"。
      滞后 ∝ 手速，所以拖得快纸就被抻得越开，手一停立刻收回。0 = 不拉。
-     ★ 1120 / 上限 0.10 是在**真鼠标**上量出来的（见 stepHold 里那张表）：
+     1120 / 上限 0.10 是在真鼠标上量的（见 stepHold 里那张表）：
      正常拖 +4%、甩一下 +10%。旧值 300 / 0.45 下正常拖就有 +15% ——
-     纸上的**字**跟着一起横向变形，用户看到就说"字怎么扁扁的"。 */
+     纸上的字跟着一起横向变形，看着就是"字怎么扁扁的"。 */
   pPuff: num("ppuff", 1120),
   pmax:  num("pmax",  0.10),   // 拉扯的上限（比例）。0 = 完全不抻
-  /* ── 纸上的字（2026-10-07 加）─────────────────────────────────────
-     用户：「井里面纸正对时会抽一段，当然，纸和抽到的段落会做个适配，
-     调整大小到比较适合展示的程度」。
-
-     ★ 尺寸**不再是一个固定倍数**（pZoom 那套），而是从内容反推：
-     抽中那一段之后，按"这段要排几行"算出纸该多大 —— 短段是一张小纸条，
-     长段是一张立起来的纸。37 段的段长实测 55~299 字（中位 148，见
-     build-doc.py 的分位统计），差 5.4 倍；固定尺寸要么让长段排不下、
-     要么让短段空荡荡，这就是要适配的原因。
-     ★ 横/纵各一个倍数（zx / zy），在抽中那一刻算出来，再用 follow 平滑
-     长过去 —— 纸是"摊开"的，不是"跳大"的。 */
+  /* 抽取段落后按排版行数反推纸尺寸，横纵倍率 zx/zy 独立计算，再由 follow 平滑展开。 */
   pfs:   num("pfs",    17),    // 正文终态字号（屏幕 px）
   ppw:   num("ppw",   326),    // 正文终态栏宽（屏幕 px）—— 纸宽 = 它 + 两倍内边距
   phmin: num("phmin", 0.20),   // 纸高下限（屏高比例）：55 字那种短段别薄成一张卡
@@ -219,78 +158,56 @@ var P = {
                                // 否则纸的两边会被屏幕切掉，字排到看不见的地方
   pick:  num("pick",  0.72),   // face 过这个值就抽一段（抽了就定死在这张纸上）
   pgrow: num("pgrow",    5),   // 纸长到目标尺寸的速率（1/s）—— 5 ≈ 0.6 秒长到位
-  pseg:  num("pseg",     0)|0, // >0 = 直接抽第 N 段（1 起）。**出图对照用** ——
+  pseg:  num("pseg",     0)|0, // >0 = 直接抽第 N 段（1 起）。出图对照用 ——
                                // 不然每次抽什么是随机的，A/B 两张图比不了。
                                // 0 = 随机（真人路径）。
   pcol:  Q.get("pcol")  || "#1B1B1B",   // 正文
   pcol2: Q.get("pcol2") || "#8A8A80",   // 出处那一行（附注，比正文浅）
   s0:    num("s0",   0.03),   // 入场起点：整块字板从灭点的多少倍长出来 —— 见 wellText。
-                              // **要小到"就是个点"**：0.28 那版一上来四行字已经成形，
+                              // 要小到"就是个点"：0.28 那版一上来四行字已经成形，
                               // 看着是"一块小板被放大"，不是"从井口淌下来"。
                               // 入场分两段：前段棱线从四面八方向中间进发、最后内端
                               // 连成一个圈（= 井口），后段字从圈里由小变大滑到位。
                               // 两段有重叠（字在棱线还没收完时就开始出来），
                               // 见 wellArt 里那两个 clamp。
-  hole:  num("hole", 0),      // 灭点处额外加的光晕。**原片没有这个**：
+  hole:  num("hole", 0),      // 灭点处额外加的光晕。原片没有这个：
                               // 那里看着像个亮盘，其实是棱线不穿过去造成的
                               // （见 backdrop 注释）。加了光晕反而不像。
   slant: num("slant",0.248),  // 字向右倾多少（斜切量，tan）—— 原片约 14°
   curl:  num("curl", 0.03),   // 一行两端往下沉多少 —— 原片基本是平的
-  pull:  num("pull", 1),      // 每条横带的**位置**要不要跟着 k 一起向灭点收（见 wellText）。
+  pull:  num("pull", 1),      // 每条横带的位置要不要跟着 k 一起向灭点收（见 wellText）。
                               // ?pull=0 是旧行为：只缩宽度、位置不动，四个字在屏幕上
                               // 仍是四根平行柱子，整行看起来上宽下窄。
-  step:  num("step", 1.0),    // 相邻两条横带的边界允许**横向错开**多少像素（见 wellText）。
-                              // 这是切横带唯一的可见代价：带与带之间必然有一级台阶，
-                              // 台阶大小由它决定。改小 = 更平滑、条数更多。
-                              //
-                              // ★ 旧参数 sl（"每带几像素高"）已删 —— 它的模型是错的。
-                              //   当时算的是「台阶 = 字宽 × 上下宽度差 ÷ 条数」，只算了
-                              //   字**自己变窄**。可加 pull 之后每条带除了变窄还要**朝
-                              //   灭点移动**，位移项远大于缩放项：1997 实测按旧模型
-                              //   "5px 带高 → 台阶 3px"，实际台阶 5.2px —— 1:1 图里
-                              //   一眼能看见一条条阶梯（`1` 的左缘、`7` 的右缘）。
-                              //   正确的量是**这个字离灭点最远的那条边**距灭点多远：
-                              //       NS = ⌈ (1−k顶) × 最远边距 ÷ step ⌉
-                              //   ?step=3 回到接近旧观感，对照用。
-  /* ★ 四行字贴的是**同一块斜板**。2026-10-06 用户看样张后说「地面的字是类似于
-     在同一个斜着的平面，你这个像在不同平面」—— 旧写法让每行各自算一套字号和拉伸
-     （字高 ×2、字宽只从 174 涨到 360），**四行的形状不一样**，所以读起来是四张
-     贴纸各缩各的，不是一个平面。
-
-     现在先造这块板，再从板上取行：
-       第 j 行的深度    z_j = persp·(1 − 2^−j)          （0 / 450 / 675 / 787）
-       投影系数        k_j = persp/(persp − z_j) = 2^j
-       屏幕位置        dy_j = (y0 + slope·z_j)·k_j
-       字号、行宽      都乘 k_j                          ← 宽高同比例才叫"一个平面"
-
-     反推原片实测行距 103.5 / 139.5 / 216.5 / 360.5：y0=103.5、slope=−0.075 时算出
-     103.5 / 139.5 / 211.5 / 355.5，四行全中 —— **原片本来就是同一块板**，只不过
-     它的行宽是设计师手调的、没跟着 k 走（174/292/302/360），所以看着才散。 */
+  step:  num("step", 1.0),    // 相邻两条横带的边界允许横向错开多少像素（见 wellText）。
+                              // 横带数由最大透视台阶反推：NS=ceil((1−k顶)×最远边距/step)。
+                              //                                台阶同时包含缩放与向灭点收拢的位移。
+  /* 文字共用斜板深度 z_j=persp·(1−2^−j)，投影 k_j=2^j。
+     行中心 dy_j=(y0+slope·z_j)·k_j，统一位置与尺寸的透视尺度。 */
   slope: num("slope", -0.075), // 板上每往近处一个单位，y 抬多少（世界像素）
-  /* 四行文案。2026-10-07 用户定了：**换成自己的话**（原来默认摆的是原片那四行，
-     为了先能一帧对上原片）。四条宽度倍率 P.kwq 是照原片的**透视**量出来的，
-     和具体写什么字无关 —— 字数变了只影响字号，宽度仍是给定的。
+  /* 四行文案。换成自己的话（原来默认摆的是原片那四行，为了先能一帧对上原片）。
+     四条宽度倍率 P.kwq 是照原片的透视量的，和具体写什么字无关 ——
+     字数变了只影响字号，宽度仍是给定的。
      ?lines=CODING,MY WAY,SINCE,1997 可以摆回原片那四行做对照。 */
   lines: (Q.get("lines") || "THINK,MY WAY,SINCE,YOUTH").split(","),
-  /* 四行的**宽度倍率**（相对最远那行）。实测原片 188/305/361/444 → 1 : 1.62 : 1.92 : 2.36。
-     ★ 原来宽度和高度**共用**一个 kz=2^j，于是四行的宽高比是恒定的；而原片的
+  /* 四行的宽度倍率（相对最远那行）。原片 188/305/361/444 → 1 : 1.62 : 1.92 : 2.36。
+     原来宽度和高度共用一个 kz=2^j，于是四行的宽高比是恒定的；而原片的
      宽高比是单调变的（6.71 → 6.10 → 2.80 → 2.0x）：越近的字越"方"。宽度串到
      8 倍、原片只有 2.4 倍 —— 差 3.2 倍，这就是「像在不同平面」除透视之外的另一半。
      量法见 _logs/_fxrows.py（两边都数像素，目测在这个尺度上会读反）。
      ?kw=1,2,4,8 回到旧行为，对照用。 */
   kwq: (Q.get("kw") || "1,1.62,1.92,2.36").split(",").map(Number),
-  cap0:  num("cap0", 0.0292), // 最远那行的**字高**（画面比例）—— 原片 21/720
-  w0:    num("w0",   0.179),  // 最远那行的**宽度**（画面比例）—— 原片 188/1280。
-                              // ★ 这个数被压到过 0.095，当时是因为末行 ×8 会撑出画面
-                              //   （0.136 → 末行 1392px）。那是**用首行去将就末行**。
+  cap0:  num("cap0", 0.0292), // 最远那行的字高（画面比例）—— 原片 21/720
+  w0:    num("w0",   0.179),  // 最远那行的宽度（画面比例）—— 原片 188/1280。
+                              // 这个数被压到过 0.095，当时是因为末行 ×8 会撑出画面
+                              //   （0.136 → 末行 1392px）。那是用首行去将就末行。
                               //   现在宽度有自己那条序列（见 P.kwq），末行只 ×2.36，
                               //   就不用再压了：首行回到原片的 188，末行 421（原片 444）。
                               //   两处是一起改的，只改一个会把整体缩掉一半。
   /* ── 卡片从井口（灭点）飞过来 ── */
   /* 出生深度取 3000 而不是 2000：出生时的投影系数 k=persp/(persp+3000)=0.23，
-     卡片投影宽约 43px，**小于井口那个圆的直径 70px** —— 这才是"从井口出来"。
+     卡片投影宽约 43px，小于井口那个圆的直径 70px —— 这才是"从井口出来"。
      取 2000 时 k=0.31、宽 57px，比井口还大，看着像卡片本来就在外面。 */
-  z0:    num("z0",  3000),    // 出生深度。z 是**朝观察者**的正方向，负 z = 井底深处
+  z0:    num("z0",  3000),    // 出生深度。z 是朝观察者的正方向，负 z = 井底深处
   vz:    num("vz",  1000),    // 朝我们飞的速度（世界单位/秒）
   gap:   num("gap",  1.85),   // 两张纸之间隔多久放一张（秒）—— 入场结束后的节奏
   sp:    num("sp",   0.07),   // 字间距（字号的比例）
@@ -301,35 +218,18 @@ var P = {
   bg:    Q.get("bg")   || "#F40B3E",    // 井底的底色 —— 原片 #F40B3E
   line:  Q.get("line") || "#B5001E"     // 棱线的颜色 —— 原片只比底暗一档
 };
-/* 字体换过：原来是 Impact，但原片的字宽得多。现在宽度是由 P.w0 直接给定、
-   字号反推出来的（见 wellText），加上 P.sp（字间距）和 P.ew（横向拉伸）补足
-   Arial Black 的窄骨架。别再换回 Impact。 */
+/* 使用 Arial Black，P.w0 指定行宽，P.sp/P.ew 补偿字距与横向骨架。 */
 /* ?t=<毫秒> 定格。null = 实时。定格的路上自动演示必须关掉，否则那个
    setInterval 会在预热完之后继续乱改卡片速度，同一帧两个样。 */
 var PIN = Q.has("t") ? num("t",0)/1000 : null;
 if (PIN !== null) P.auto = false;
-/* ── 入场闸 `?gate=1` ────────────────────────────────────────────────
-   ★ 要它干什么：父页（`town.html`）在黑幕开始往下落的**同一刻**就给这里填了
-     `src`，而 `demoT` 是"这份文档活了多久"（见 frame）。实测
-     （`_logs/_wellintro.py`，跨文档读这一页自己报的 `#hud`）：
-        0.76s 入场 34% ／ 1.69s 入场 75% ／ 2.48s 已经走完
-     而幕上那 5 行字默认要走到 4.82s 才出齐、才点得动 —— 于是这 2.2 秒
-     **整段演在黑幕后面**，用户一次都看不见（手快时只能撞上尾巴，比一直
-     看不到还难查）。有了闸，它改从"幕开始让开"那一刻起跑。
-   ★ 冻的是**钟**，不是画面：`demoT` 停在 0，而 `wellIntro(0)` 照常每帧画 ——
-     那就是入场的第 0 帧（棱线内端还在画布外，字板是灭点上的一个小不点）。
-     所以解冻前后是连着的，不会跳一下。
-   ★ 单独打开这一页不带闸，照常自动播 —— `?gate=1` 只有父页会加。 */
+/* ?gate=1 冻结 demoT=0 并继续渲染入场第 0 帧；收到父页 well-go 后起钟。
+   单独打开不加闸，自动播放入场。 */
 var GATE = Q.has("gate");
 /* ?persp= 显式给了就认显式，否则每次 resize 按画面高度重算（见 resize）。 */
 var PERSP_SET = Q.has("persp");
-/* ?hold=<face> 定格：不跑指针事件，直接把**第一张**纸按在屏上、定死在给定的
-   转正程度上（?hold=0.35 看纸上那行字淡入到一半，?hold=1 看终态）。
-   x/y 用 ?holdx= ?holdy= 给，默认屏幕中心偏下一点。
-   ★★ 它**证明不了**"拖起来能抽到字"这条链路 —— 它压根不经过 pointerdown，
-     是绕过事件直接把状态写死的。复刻页上 `?go=1` 就是这么骗过一次人的
-     （只改 phase，点击链是断的，而图上一切正常）。链路要用 CDP 发真鼠标
-     事件验（见 _logs/paper-hold.py 的第二个场景）。 */
+/* ?hold=<face> 直接固定首张纸的转正程度，?holdx/holdy 指定位置。
+   此入口绕过 pointerdown，仅检查画面；拖动与抽段链路需用真实指针事件验证。 */
 var FR = Q.has("hold")
        ? { face: clamp(num("hold", 1), 0, 1),
            hx: Q.has("holdx") ? num("holdx", 0) : null,
@@ -351,12 +251,12 @@ var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
    会把全局 `ctx` 临时指到 ctxup 上（跟 layer() 同一套手法）。 */
 var cvup = document.getElementById("cvup"), ctxup = cvup.getContext("2d");
 var W=0,H=0,DPR=1;
-/* 消失点 = 井的口，**也是整个场景的投影中心**。
-   原片（_logs/_wod/_x/full_00107.1.png，1280×720）实测线全部汇聚于
+/* 消失点 = 井的口，也是整个场景的投影中心。
+   原片（_logs/_wod/_x/full_00107.1.png，1280×720）的线全部汇聚于
    (640, 256) = (0.500W, 0.356H) —— 不是画面中心，相机是俯视的。
    卡片和字共用这一个中心才读得成同一个空间；各用各的中心，两层皮一眼就穿。 */
 var VP = {x:0, y:0};
-/* 井口那个「出口」的 DOM。**在这里取一次就够** —— 它在 HTML 里，脚本跑起来时
+/* 井口那个「出口」的 DOM。在这里取一次就够 —— 它在 HTML 里，脚本跑起来时
    已经存在；而它的位置每帧都在变（VP 跟着 W/H 走），所以位置是摆出来的、不是取出来的。 */
 var exitEl = document.getElementById("exit");
 function resize(){
@@ -364,15 +264,9 @@ function resize(){
   W = cv.clientWidth; H = cv.clientHeight;
   cv.width = Math.max(1,Math.round(W*DPR));
   cv.height= Math.max(1,Math.round(H*DPR));
-  /* ★ 上面把 canvas 的**属性**尺寸设成了 W*DPR，于是它的**绘制坐标系是设备
-     像素**，而 W/H 是 CSS 像素。这里把坐标系乘回 DPR，两者才对得上。
-     少了这一句，整个画面只画到左上角 1/DPR² 那一块，剩下的露出 body 底色 ——
-     DPR=2 时正好是左上四分之一。
-     ★★ 这个错**只在真人打开页面时**出现：本项目的无头探针一律跑在
-     `--force-device-scale-factor=1` / `deviceScaleFactor=1` 上，DPR 恒为 1，
-     出图张张正常。同理还有 frame() 里那个 demoT 时钟。 */
+  /* canvas 后备尺寸使用 W*DPR，绘制前按 DPR 缩放，使 CSS 像素与设备像素对应。 */
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  /* 纸层跟着一起改尺寸。★ 它和 #cv 必须**同尺寸同变换** —— 纸的四个角点是
+  /* 纸层跟着一起改尺寸。它和 #cv 必须同尺寸同变换 —— 纸的四个角点是
      屏幕坐标（sheetQuad 算出来的），两张画布差一个像素，纸看着就在井壁上
      错开一格，而这件事在静态图上永远看不出来（只有拖动时才显形）。
      #cvup 的 CSS 尺寸是 100%（跟 #cv 一样），所以这里直接复用 W/H，不另量。 */
@@ -380,17 +274,11 @@ function resize(){
   cvup.height= Math.max(1,Math.round(H*DPR));
   ctxup.setTransform(DPR, 0, 0, DPR, 0, 0);
   VP.x = W*P.vpw; VP.y = H*P.vph;
-  /* ★ 透视尺度跟着**画面高度**走，不是写死 900。900 这个数是照原片 1280×720 量的
-     （= 1.25×720）；写死它，换个高度整口井就散 —— 1440×900（16:10）实测末行的
-     底边落到屏幕外 87px。跟着 H 走则井的构图在任何高度下都跟原片一致，多出来的
-     宽度只是两侧的背景。
-     ★ 所有长度量必须**共用一个尺度**，这是要害：`y0` 按 H 缩、`zj` 却按固定的
-     persp 缩，两者的比值会随高度漂，行距就乱了 —— 只改 persp 不改 y0（y0 本来
-     就按 H）正好配平。 */
+  /* 透视尺度随 H 变化，所有长度共用同一尺度，避免尺寸变化后文字行距漂移。 */
   if (!PERSP_SET) P.persp = H*1.25;
   placeExit();
 }
-/* 「出口」钉在井口中心。**它和 canvas 上那口井共用同一个 VP**，绝不另算一个 ——
+/* 「出口」钉在井口中心。它和 canvas 上那口井共用同一个 VP，绝不另算一个 ——
    两处各算一次迟早会漂开，而"字没在井口上"只能靠看图发现，代码里读不出来。
    `min(W,H)` 那种"画面比例"式的算法在这里是错的：VP 本来就是 W*P.vpw / H*P.vph，
    照抄它才叫同一个点。 */
@@ -402,7 +290,7 @@ function placeExit(){
 addEventListener("resize", resize);
 
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
-/* 跟手/速度都用指数滤波**按 dt 折算**，不是每帧固定比例 ——
+/* 跟手/速度都用指数滤波按 dt 折算，不是每帧固定比例 ——
    固定比例会让手感随帧率变，120Hz 上"更跟手"、30Hz 上"发飘"。 */
 function follow(cur, target, k, dt){ return cur + (target-cur)*(1-Math.exp(-k*dt)); }
 
@@ -418,13 +306,13 @@ function rot3(p, rx, ry, rz){
   return [x2, y1*cx - z2*sx, y1*sx + z2*cx];       // Rx
 }
 /* 透视投影：z 越大越近。z=0 落在比例 1 上，所以卡片的"静止面"就是 z=0。
-   投影中心是**消失点**不是画面中心 —— 于是 z=0 平面上，世界坐标 (x,y) 直接
+   投影中心是消失点不是画面中心 —— 于是 z=0 平面上，世界坐标 (x,y) 直接
    就是"离消失点多少像素"。 */
 function proj(p){ var k = P.persp/(P.persp - p[2]); return [VP.x + p[0]*k, VP.y + p[1]*k, k]; }
 
-/* 卡片是**薄盒子**。六个面按平均深度排序后依次画，就是画家算法 ——
+/* 卡片是薄盒子。六个面按平均深度排序后依次画，就是画家算法 ——
    凸体用这个永远对，不需要 z-buffer。
-   n 记的是**物体自己的**轴向，不是屏幕方向：书转到任何角度，"+x 面"都还是
+   n 记的是物体自己的轴向，不是屏幕方向：书转到任何角度，"+x 面"都还是
    书口那一面。光靠 front/back/side/edge 分不出左右，而书本的六面恰好是
    「封面 / 封底 / 书脊 / 书口 / 上切口 / 下切口」六个各不相同的颜色。 */
 var FACES = [
@@ -437,8 +325,8 @@ function Card(seed, x, y){
   this.seed = seed;
   var r = mulberry32(seed);
   /* 书的开本。比明信片（150~220 宽、h/w≈1.29、t/w≈0.11）更狭长也更厚：
-     ★ 厚度是关键的一笔。书口那叠纸页是整个形状上**唯一认得出"这是书"**的记号，
-       盒子太薄就只剩一块板。t/w 从 0.11 提到 0.22~0.32，纸页层线才画得下。 */
+     厚度是关键的一笔。书口那叠纸页是整个形状上唯一认得出"这是书"的记号，
+     盒子太薄就只剩一块板。t/w 从 0.11 提到 0.22~0.32，纸页层线才画得下。 */
   this.w = 132 + r()*52;
   this.h = this.w * (1.36 + r()*0.16);   // 竖开本
   this.t = this.w * (0.22 + r()*0.10);
@@ -470,8 +358,8 @@ function poly(pts, fill){
   ctx.fillStyle = fill; ctx.fill();
 }
 
-/* 把局部坐标 (u,v)（u,v ∈ -1..1）放到卡片的**正面**上。
-   照片是**矢量面片**画的，不是贴图 —— 贴图在透视下需要单应变换，
+/* 把局部坐标 (u,v)（u,v ∈ -1..1）放到卡片的正面上。
+   照片是矢量面片画的，不是贴图 —— 贴图在透视下需要单应变换，
    canvas 只有仿射，硬贴会在强透视时明显歪掉。矢量面片每个顶点单独
    投影，透视天然是对的。 */
 function onFace(c, u, v, dz){
@@ -485,10 +373,10 @@ function faceQuad(c, u0,v0,u1,v1, dz, fill){
         onFace(c,u1,v1,dz), onFace(c,u0,v1,dz)].map(proj), fill);
 }
 
-/* 物体**侧面**上的点：side=+1 是物体自己的 +x 面（书口），-1 是 -x 面（书脊）。
-   v ∈ -1..1 沿书高，z 是沿**厚度**的世界单位（±t/2）。
-   ★ 纸页的层线必须走这条参数化，不能在屏幕上按 y 均分 —— 书一转，屏幕上"竖着"
-     的方向就不是书口上那个方向了，线会斜着穿出封面。 */
+/* 物体侧面上的点：side=+1 是物体自己的 +x 面（书口），-1 是 -x 面（书脊）。
+   v ∈ -1..1 沿书高，z 是沿厚度的世界单位（±t/2）。
+   纸页的层线必须走这条参数化，不能在屏幕上按 y 均分 —— 书一转，屏幕上"竖着"
+   的方向就不是书口上那个方向了，线会斜着穿出封面。 */
 function onSide(c, side, v, z){
   var w=c.w/2, h=c.h/2;
   var p = rot3([side*w, v*h, z], c.rx, c.ry, c.rz);
@@ -499,7 +387,7 @@ function sideQuad(c, side, v0, v1, z0, z1, fill){
         onSide(c,side,v1,z1), onSide(c,side,v0,z1)].map(proj), fill);
 }
 
-/* 六个面各是什么颜色。认的是**物体自己的**轴向（见 FACES 那段），不是屏幕方向。 */
+/* 六个面各是什么颜色。认的是物体自己的轴向（见 FACES 那段），不是屏幕方向。 */
 function faceFill(f){
   if (f.n === "+z") return C.cover;       // 封面
   if (f.n === "-z") return C.coverDark;   // 封底
@@ -507,7 +395,7 @@ function faceFill(f){
   return C.pageC;                         // +x 书口、±y 上下切口 —— 都是纸的边
 }
 
-/* 书口那一叠纸。在 +x 面上画几条平行于**书高**的细线，线沿厚度均分 ——
+/* 书口那一叠纸。在 +x 面上画几条平行于书高的细线，线沿厚度均分 ——
    那正是纸页叠起来的方向。这是整个形状上唯一认得出"这是书"的记号：
    封面上画什么都可以是一块牌子，只有这一叠边骗不了人。 */
 function pages(c){
@@ -545,7 +433,7 @@ function drawCard(c){
   for (var o=0;o<order.length;o++){
     var f = order[o].f, pts = f.i.map(function(k){ return proj(K[k]); });
     poly(pts, faceFill(f));
-    /* ★ 面上的细节必须**紧跟着它那个面**画，不能等循环走完再补：封面的装饰如果
+    /* 面上的细节必须紧跟着它那个面画，不能等循环走完再补：封面的装饰如果
        留到最后画，封面转到背面去的时候它们会盖在书脊和书口上面。 */
     if (f.n === "+x") pages(c);
     else if (f.n === "-x") spineArt(c);
@@ -575,7 +463,7 @@ function coverArt(c){
     faceQuad(c, cx0-0.29, gy, cx0+0.29, 0.86, 0.9, C.beam);     // 墙
     faceQuad(c, cx0-0.13, 0.50, cx0+0.05, 0.72, 1.3, C.warm);   // 亮着的窗
   } else if (m === 1){
-    /* 书名签：贴着书脊一块纸色横带。**不写字** —— 书在井里是飞着的，字在那个
+    /* 书名签：贴着书脊一块纸色横带。不写字 —— 书在井里是飞着的，字在那个
        尺度上只会糊成几个墨点，比不写脏。 */
     faceQuad(c, -0.86, -0.14, 0.34, 0.14, 0.6, C.pageC);
   } else {
@@ -588,7 +476,7 @@ function coverArt(c){
   }
 }
 
-/* 「魔法消失」：参考帧 55.5 那格看得出它是**转到侧立**、只剩一条深色薄片，
+/* 「魔法消失」：参考帧 55.5 那格看得出它是转到侧立、只剩一条深色薄片，
    然后才没的。所以这里不是淡出，是把 ry 推到 ±90° 同时把厚度收到 0。 */
 function drawDying(c, K){
   var p = clamp(c.dying/0.45, 0, 1);
@@ -613,37 +501,11 @@ function drawDying(c, K){
 }
 function lerp(a,b,t){ return a+(b-a)*t; }
 
-/* ── 纸：井壁上的一块楔形（P.paper=1，默认）─────────────────────────
-   用户 2026-10-07：「书要不这样子，是白色的纸，然后出现的话是，中间一个小点
-   到井口的边缘，然后成为被某两条黑线约束的白色梯形。这样会好做吧」
-
-   ★ 「好做」是真的，而且**比 3D 那个盒子简单一个量级**，原因值得写下来：
-     井壁在屏幕上本来就只是一组从灭点发散的**纯 2D 射线**（见 wellArt，
-     内端 holeR*0.9、外端 len，中间没有任何 z）。所以"两条黑线之间的那块"
-     就是极坐标里的一个矩形 (θ0..θ1) × (r0..r1)，投影到屏幕是个四点多边形。
-     不需要六个面、不需要画家算法、不需要旋转矩阵 —— 而**透视已经在极坐标里了**：
-     远端半径小所以窄、近端半径大所以宽，梯形是自动出现的，一个三角函数都不用算。
-
-   三段就是用户说的那三步：
-     ① 0 → pRise            灭点上的一个点，往外走到井口边缘（r = holeR*0.9）
-     ② → pRise+pGrow        内端**钉在井口**，外端往外长 —— 点摊成梯形
-     ③ 之后                 两端一起匀速外滑，长度不变，滑出画面
-   ★ ①的内端从 0 开始、②的内端停在井口，是"到井口的边缘"那一句的直接翻译：
-     用户看得到灭点周围那个亮盘（棱线不穿过它，见 backdrop 注释），纸就从那儿长。
-
-   ★ 角度**出生时定死、之后不变**。贴在井壁上的东西不会自己转到别的棱线上去；
-     转了就成了一张浮在空中飘的卡片，正是用户要换掉的那个东西。 */
-/* ── 纸上抽到的那一段 ────────────────────────────────────────────────
-   用户 2026-10-07：「就这样放，然后这37段同时是书店纸上的内容」——
-   就是这台机器屏幕里那个 txt 的同一批 37 段（源 `Desktop\xiaoku.docx`），
-   现在也是**井里那张纸**的内容：「井里面纸正对时会抽一段」。
-
-   ★ 这一段由 `_ref/BV1CMcyzUEHr/_logs/build-doc.py --apply` 生成 ——
-     它同时写 index.html 的 `var SRC`（按书分组，屏幕里的记事本用）和
-     这里（**扁平**的 [出处, 正文]）。改文案改 docx 再重跑脚本，
-     **别手改下面这个数组**，两个产物会漂移。
-   ★ 为什么这边是扁平的：纸上一次只抽一段，抽签在 37 条上均匀 ——
-     按书分组的话，书里条目多的那本被抽中的概率就大了一倍。 */
+/* 纸使用极坐标区域 (θ0..θ1)×(r0..r1) 构造四边形；角度固定在出生时。
+   先从灭点移到井口，再展开为梯形，最后等长外滑；半径过程见 sheetRange()。 */
+/* 纸内容来自读书笔记的 37 段，由 _ref/BV1CMcyzUEHr/_logs/build-doc.py --apply 生成。
+   与桌面记事本共用来源；修改源文档后同时重建两份数据。
+   此处展开为 [出处,正文]，按段落抽取。 */
 var PS = [
   ["不能结束的辩论", "呵呵，又是这种SB对手。\n我大力拍桌站起，手掌皮肤生疼火辣。\n所有人的目光凝视着我，教室安静一片。\n这是在哪？这是在干什么？\n哦，原来我不在打辩论，我在自习。"],
   ["不能结束的辩论", "救救我救救我，救救我救救我。\n不，你快走你快走你快走你快走你快走。\n离开就可以了，你根本不需要过来告诉我结果。\n进来也可以！说话也可以！……了我就都可以。所以在此之前请赶紧……\n杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了我杀了"],
@@ -690,22 +552,22 @@ var sheets = [], sheetQ = 0;
 function holeR(){ return Math.min(W,H)*0.048*0.90; }   // 井口半径，跟 wellArt 同一套
 
 /* ── 纸上排字（见 P.pfs 那一段的注释）──────────────────────────────
-   ★ **不能用 Zpix**。这一页内联的那个子集只裁了 160 字（是为了井口「出口」
-     两个字裁的），37 段正文里有几百个不同的字，缺字是**静默回退**：
-     CSS 一字不错，混排出来一半点阵一半平滑，第一眼只会当成"像素字体没
-     生效"。用系统无衬线，跟屏幕那边（用户指定的"黑体"）同一套语言。 */
+   不能用 Zpix。这一页内联的那个子集只裁了 160 字（是为了井口「出口」
+   两个字裁的），37 段正文里有几百个不同的字，缺字是静默回退：
+   CSS 一字不错，混排出来一半点阵一半平滑，第一眼只会当成"像素字体没
+   生效"。用系统无衬线，跟屏幕那边（指定的"黑体"）同一套语言。 */
 var PAPER_FONT = '"Microsoft YaHei","PingFang SC","Heiti SC",sans-serif';
 var NO_HEAD = "、。，；：？！）》」』】…—·";     // 避头点：不让标点吊在行首
-/* 度量用**自己的一张 canvas**，不借全局 ctx —— 全局 ctx 在 drawUpLayer 里
+/* 度量用自己的一张 canvas，不借全局 ctx —— 全局 ctx 在 drawUpLayer 里
    会被临时指向 #cvup，在 layer() 里又指向一张离屏的，取决于谁在调。
    字体度量和这些都不相干，分开一份就没有"什么时候调"这个前提。 */
 var mcv = document.createElement("canvas"), mctx = mcv.getContext("2d");
 
-/* 一个 ASCII「词」里允许有哪些字符 —— 这串字符内部**不许断开**。
-   ★ 为什么要有这个概念：中文没有词边界，逐字换行本身是对的；但一路逐字切到
+/* 一个 ASCII「词」里允许有哪些字符 —— 这串字符内部不许断开。
+   为什么要有这个概念：中文没有词边界，逐字换行本身是对的；但一路逐字切到
    ASCII 上也照切，就会把数字劈成两半。出图撞上的正是这个：#11 排成
    「…说是她有100」/「0种地方是可能去的。」—— 1000 被切成 100 + 0。
-   而且它**调参救不了**：那一行本来就没排满，放宽栏宽、缩字号都不改变结果，
+   而且它调参救不了：那一行本来就没排满，放宽栏宽、缩字号都不改变结果，
    只有看图才看得见。（`.` 也收进来是为了 `b.1. b.2.` 那种子列表不散架。） */
 var WORDRE = /[0-9A-Za-z.%_-]/;
 
@@ -727,7 +589,7 @@ function pieces(s, maxW){
   return out;
 }
 
-/* 按宽度断行。★ 硬换行（\n）必须尊重：docx 里那 37 段**段内自带换行**，
+/* 按宽度断行。硬换行（\n）必须尊重：docx 里那 37 段段内自带换行，
    连排会把作者自己的断句抹掉（build-doc.py 里 "内含 N 行" 报的就是这个）。 */
 function wrapText(txt, maxW){
   var out = [], paras = String(txt).split("\n");
@@ -735,9 +597,7 @@ function wrapText(txt, maxW){
     var line = "", ps = pieces(paras[p], maxW);
     for (var i=0;i<ps.length;i++){
       var u = ps[i];
-      /* 避头点：这一行已经排了字、再加一块就溢出、而这块是以标点开头的 ——
-         那就让它跟着上一行（宁可略超一点）。不做也不报错，但那些
-         「。」「，」会孤零零吊在行首，一眼就看出来。 */
+      /* 避免标点落在行首：已占满的上一行允许略超宽以容纳开头标点。 */
       if (line && NO_HEAD.indexOf(u.charAt(0)) < 0 &&
           mctx.measureText(line + u).width > maxW){ out.push(line); line = u; }
       else line += u;
@@ -747,17 +607,8 @@ function wrapText(txt, maxW){
   return out;
 }
 
-/* 一段文字 → 纸的**终态**尺寸。这是"适配"的本体：先按基准栏宽排一遍拿到
-   行数 → 由行数定纸高 → 顶到屏高上限就往回调。能调的只有两样：
-     · **放宽**（每行多装几个字 → 行数变少 → 纸变矮）
-     · **缩字号**（行高和字一起缩 → 纸变矮，代价是字变小）
-   ★★ 两样都必须有，只放宽是不够的 —— 出图就撞上了：37 段里的 #23 是短句诗，
-     **22 个硬换行**，一行就是一句。放宽栏宽**一行都省不下来**，于是循环把
-     纸从 326 一路放宽到 509，高度纹丝不动（685px，占屏高 76%），纸变成一张
-     更宽、一样高的横幅，越调越糟。所以循环里比的是**上一轮的行数**：
-     放宽如果没让行数变少，下一轮就改缩字号。
-   ★ 高度是**取 max 不取 min**：短段落的纸被 phmin 托住时，多出来的是留白
-     （内容仍从顶部排）—— 一张纸上下留白很正常，字被压扁就不正常了。 */
+/* 先按基准宽度排版，用行数反推纸高；超高时依次尝试放宽与缩字号。
+   若硬换行使放宽不再减少行数，转为缩字号。phmin 形成留白，不压缩文字高度。 */
 function layoutFor(txt, src){
   var fs = P.pfs, pad = fs*1.30, w = P.ppw;
   var hMax = H*P.phmax, hMin = H*P.phmin, wMax = W*P.pwmax;
@@ -772,8 +623,7 @@ function layoutFor(txt, src){
     if (h <= hMax || it === 6)
       return { w: w + pad*2, h: Math.max(h, hMin), fs: fs, lead: lead, pad: pad,
                lines: lines, src: src, block: block, tail: tail };
-    /* 还有得省就放宽（但别宽过 pwmax，纸宽出屏幕就没法看了）；
-       上一轮放宽没换来行数下降 → 改缩字号。 */
+    /* 未超过 pwmax 时先放宽；若行数未减少则缩字号。 */
     if (lines.length < prevN || prevN < 0){
       if (w*1.16 + pad*2 <= wMax) w *= 1.16;
       else fs *= 0.90;
@@ -783,32 +633,11 @@ function layoutFor(txt, src){
   }
 }
 
-/* ── 抽签：洗牌袋 ───────────────────────────────────────────────────
-   原来是 `Math.floor(rnd()*PS.length)`，而 `rnd` 是**定种子**的
-   （`mulberry32(parseInt(Q.get("seed"),10) || 20261006)`，种子写死在代码里）。
-   于是每次进井，纸的出生方向、**第几张纸抽到哪一段，全是算好的** ——
-   实测连进两次井都抽到 #36《浮白》。用户 2026-10-07：「要不还是进去后
-   随机排序给吧，这样不会老是抽到同一张」。
-
-   所以改成**洗牌袋**：进井时把 37 段洗一遍，按顺序发，**一轮内不重复**，
-   发完重洗。这比"每次独立随机"强的地方不是更随机，是**不会撞车** ——
-   独立随机的重复是"意料之中"（37 选 1 连撞两次概率 1/37），
-   但用户看见的就是"怎么又是这张"。
-
-   ★ 走**自己的一条序列**，不碰 `rnd()`。两个诉求正好相反：洗牌要的是
-     "每次进井都不一样"，`rnd()` 要的是"同一个 seed 跑出同一份"。
-     混在一起还会让纸的出生序列随"用户拖了几次"漂。
-     代价要记一笔：`pickFor` 不再消耗 `rnd()` 了，它之后那些调用整体前移一位，
-     所以井里纸/书的方向和改动前**不同**（同一次运行内依然自洽）。
-   ★ `?pseed=N` 给定就完全可复现（出图 A/B 用）；
-     `?pseg=N` 是"钉死第 N 段"，绕开袋子、也不消耗它（出图对照用）。 */
+/* 37 段用独立洗牌袋发放，每轮不重复，耗尽后重洗，不消耗几何 rnd。
+   ?pseed=N 固定抽签，?pseg=N 直接固定段落且不消耗袋子。 */
 var bag = [], bagIx = 0, bagSeed = 0, bagLast = -1;
-/* `?oldpick=1` 走**改之前**那条：`Math.floor(rnd()*PS.length)` —— 定种子、
-   每次进井一个样。留着它是为了让"这条改动到底改了没有"能被**当场演示**：
-   连开三次，带 `?oldpick=1` 三次同段、不带则三次不同段。
-   （这次就是这么验的：`scripts/paper-bag.py`。改动要是被谁回退掉，这条也会说话。）
-   ★ 只在**第一次**抽签上等价于旧版 —— 旧版每次抽签都消耗一个 `rnd()`，新版不消耗，
-     所以第二次起两边的消耗位就错开了。做 A/B 只比第一次那道。 */
+/* ?oldpick=1 保留旧的定种子独立抽签对照，仅首抽与旧版等价。
+   scripts/paper-bag.py 比较跨加载首段；后续抽签不再与几何 rnd 同步。 */
 var OLDPICK = Q.has("oldpick");
 function bagShuffle(seed, avoid){
   bagSeed = seed >>> 0;
@@ -819,24 +648,19 @@ function bagShuffle(seed, avoid){
     var k = Math.floor(r()*(j+1));
     var t = bag[j]; bag[j] = bag[k]; bag[k] = t;
   }
-  /* 重洗之后，开头别和**刚发出去的**那段撞上。37 选 1 正好撞上末段的概率
-     只有 1/37，但"连着两张同一段"恰好是最扎眼的那种重复 —— 而用户要的
-     就是别老抽到同一张，这一下是最便宜的保险。（换到袋里随机一位，不是
-     跟第 2 位换 —— 那只会把重复推后一张。） */
+  /* 重洗时避免首段与上一轮末段相同；固定 pseed 的重洗仍保持可复现。 */
   if (avoid >= 0 && bag.length > 1 && bag[0] === avoid){
     var k2 = 1 + Math.floor(r()*(bag.length-1));
     var t2 = bag[0]; bag[0] = bag[k2]; bag[k2] = t2;
   }
   bagIx = 0;
 }
-/* 默认种子是**真随机**，不是 rnd() —— 这里要的恰恰是"不可复现"。
+/* 默认种子是真随机，不是 rnd() —— 这里要的恰恰是"不可复现"。
    （DSNOISE 那段用 Math.random() 是同一个理由，见那里的注释。） */
 bagShuffle(Q.has("pseed") ? (parseInt(Q.get("pseed"),10) >>> 0)
                           : ((Math.random()*4294967296) >>> 0), -1);
 function bagNext(){
-  /* 发完一轮 → 重洗。新种子由旧种子推出来，而不是再取一次随机：
-     `?pseed=` 要能复现**整个**序列（包括第 38 段那次重洗），
-     而默认路径下每轮的种子仍然各不相同。 */
+  /* 新轮种子由旧种子推导，使 ?pseed= 可复现跨轮序列。 */
   if (bagIx >= bag.length)
     bagShuffle((bagSeed*1664525 + 1013904223) >>> 0, bagLast);
   var v = bag[bagIx++];
@@ -844,7 +668,7 @@ function bagNext(){
   return v;
 }
 
-/* 抽一段，并算出这张纸该多大。抽中就**定死**在这张纸上 —— 同一张纸不换字，
+/* 抽一段，并算出这张纸该多大。抽中就定死在这张纸上 —— 同一张纸不换字，
    "抽一次"才是一次（否则每帧都可能重抽，字会闪）。 */
 function pickFor(s){
   var i = P.pseg > 0 ? (P.pseg - 1)
@@ -853,9 +677,7 @@ function pickFor(s){
   s.pick = PS[i];
   s.segN = i + 1;
   s.lay = layoutFor(s.pick[1], s.pick[0]);
-  /* 目标倍数 = 目标屏幕尺寸 ÷ 按下那一刻冻结的那两个长度。
-     ★ 下限 1：抓得住的最小条件是 r1-r0 ≥ 0.7（见 hitSheet），刚出生的纸
-       fh 可以很小，除以它会炸成几百倍。夹一下不影响结果，只防爆炸。 */
+  /* 目标缩放=排版目标尺寸/按下时冻结尺寸；下限为 1，防止初生小纸产生无效比例。 */
   s.tzx = s.lay.w / Math.max(s.fw, 1);
   s.tzy = s.lay.h / Math.max(s.fh, 1);
 }
@@ -866,32 +688,17 @@ function spawnSheet(){
   if (demoT < P.wt && !FR) return null;
   var N = Math.max(6, P.rays)|0;
   var span = clamp(P.pSpan|0, 1, N-1);
-  /* 出生方向：**左右为主、上方为辅**，正下方一律不要。
-     ★ 为什么不"在整圈里随机、只把朝下的拒掉"（那是上一版，出过图）：
-     θ 均匀采样时 sinθ 的密度被 |cosθ| 加权，绝大多数落在**正上**附近；
-     而正上恰恰是空间最小的方向 —— 灭点 y=320，到此只有 320px，
-     纸还没长全就贴到顶边，"从井口展开成梯形"这个动作根本看不见
-     （见 _shots/_bkwide.png 那一版：六格全在边角打转）。正左/正右各有
-     720px 反而是最空的地方，却几乎抽不到。所以改成先选左右一半，
-     再按 1-√rnd 取离水平线的夹角：这个分布里 75% 落在水平线 ±45° 以内。
-     ★ 下方为什么必须让开：字区**整个**在灭点下方（THINK 顶边 y≈453），
-     所以朝下的纸一定压字；而剩下的"上、左、右"正是用户描述原片的那句
-     「书是从上左右边界处离开」。两条要求在这里是同一件事。 */
+  /* 纸主要向左右、少量向上，避开灭点下方字区。
+     先选左右侧，再按 1−sqrt(rnd) 分配夹角，约 75% 落在水平 ±45° 内。 */
   var a = (Math.PI/2)*(1 - Math.sqrt(rnd()));      // 离水平线的夹角 0..90°
   var want = (rnd() < 0.5) ? -a : Math.PI + a;     // 右半 -a(=360°-a)、左半 180°+a
-  /* 吸附到最近的棱线上 —— "被某两条黑线约束"要求左右两条边正好压着两条棱线，
-     而第 i 条棱线的角度是 (i/N)*2π + 0.37，于是反过来解 i 再取整。
-     取模是为了让负的 i（右半那几个）绕回 0..N-1。 */
+  /* 角度按第 i 条棱线 (i/N)*2π+.37 反解并取整，取模回有效索引。 */
   var i = Math.round((want - 0.37)*N/6.283185307 - span/2);
   i = ((i % N) + N) % N;
-  /* 中心角取在第 i 与第 i+span 条棱线的**正中**，左右各摊 span/2 ——
+  /* 中心角取在第 i 与第 i+span 条棱线的正中，左右各摊 span/2 ——
      这就是那两条边落在棱线上的原因。 */
-  /* 拖拽那一套，全部归零起（见 stepHold / sheetQuad）：
-     held 正被手拽着 · hold 按下那一刻的锚 · face 转正程度 0→1
-     fx/fy 转正后纸心的屏幕位置 · fw/fh 转正后纸的尺寸（按下那一刻按当时的大小冻结）
-     zx/zy 横/纵两个方向的倍数（出生时是 pZoom 那个默认倍数，抽中一段之后
-           由 pickFor 改成"排得下这段"的倍数，见那里的注释）
-     pick/lay/segN 抽中的那一段、它的排版结果、它在 PS 里的序号（hud 和探针要读） */
+  /* 拾取状态统一初始化：held/hold 记录指针与锚点，face 控制转正，fx/fy 为屏幕位置。
+     fw/fh 冻结原尺寸，zx/zy 控制目标缩放。 */
   var s = { th: ((i + span/2)/N)*6.283185307 + 0.37, t: 0, dying: 0,
             held: false, hold: null, face: 0, fx: 0, fy: 0, fw: 0, fh: 0, puff: 0,
             zx: P.pZoom, zy: P.pZoom, pick: null, lay: null, segN: 0,
@@ -900,17 +707,8 @@ function spawnSheet(){
   return s;
 }
 
-/* 一块纸的几何：[内端半径, 外端半径]。
-   ★ ②那一段是**两端一起往外张**，不是"内端钉在井口、外端自己往外长"。
-     后者出过一次图：内端停在 r=39（井口），外端跑到 r=366，而屏幕宽度 = r·Δθ，
-     于是远端只有 13px、近端 120px —— 一张**极尖的楔**，看着像一柄刀或一束光，
-     不是纸。根子是"从井口长出来的东西必然是尖的"，它在灭点那儿宽度归零。
-     两端同张（内端走在 0.28·pLen、外端走在 1.28·pLen）比例就一直是 1:3 上下，
-     像一块板。内端取 0.28 而不是 0.5，是为了让梯形**从井口长出来** ——
-     用户那句「中间一个小点到井口的边缘，然后成为白色梯形」，落到几何上就是
-     内端起步时贴着井口（e=1 时 r0 = 39+56 = 95，井口是 39）。
-   ②的缓动用 smoothstep 不用线性：线性是前后两帧一样快地变宽，看着像"被拉开"；
-     smoothstep 先慢、中间快、最后收，像一张纸被展开。 */
+/* 展开阶段内外半径同时增长，分别走 .28·pLen 与 1.28·pLen。
+   smoothstep 保持展开缓动，避免内端钉死产生过尖楔形。 */
 function sheetGeom(s){
   var h = holeR(), t = s.t;
   if (t < P.pRise) return [h*(t/P.pRise), h*(t/P.pRise)];   // ① 就是个点
@@ -921,40 +719,9 @@ function sheetGeom(s){
   return [r0 + out, r0 + P.pLen*e + out];
 }
 
-/* ── 消散：把纸「晕染」掉 ────────────────────────────────────────────
-   用户 2026-10-07：「纸的那个拉扯过来啊、消散啊的效果做一下」。
-   ★ 原片里卡片**不是淡出**：115.0s 还在，115.5s 碎成几团边缘分叉的红斑、
-   从上边缘往内啃，116.0s 全没了（帧见 _logs/_wod/_x/t00115_50.png）。
-   字幕念的是「晕染消失的效果」，文档记的是「影像消失」—— 说的是同一件事。
-   ★ 原片用的是 236KB 的逐帧精灵图 sprite-vanish.png。这个项目的兜底必须是
-   一个能单独发出去的 HTML，**不能带素材**，所以这里程序化生成。
-
-   做法：一张 fbm（三层 value noise）＋一个朝上的梯度偏置。噪声场只算一次
-   （dsInit），之后每帧按**当前阈值**直接把 alpha 通道写进一张复用的 scratch
-   canvas（dsMaskAt）—— 阈值随消散进度连续滑，所以啃的边缘是分形的、而且是
-   均匀长出来的。
-   ★ 为什么不预生成 8 张、在相邻两张之间交叉淡化（那是第一版，出过图）：
-     alpha 是**乘性叠加**的，做不出线性插值。两张 alpha=1 的遮罩各按
-     1-fr / fr 的 globalAlpha 叠上去，净覆盖是 1-(1-(1-fr))(1-fr) = 1-fr(1-fr)，
-     fr=0.13 时只有 0.887 —— **在最该吃干净的地方反而漏回 12% 的纸**。
-     实测：M[6] 明明是 99.9% 不透明，纸心却只盖住 88%，整张纸泛粉。
-   ★ 也不靠"多预生成几十张、只取最近的一张"：阈值间隔要小于软边宽（0.16）
-     才看不出台阶，那要上百张，9MB 起步。插值阈值只要 192×192 一次重算，
-     0.3ms，一张 scratch 就够。
-   ★ 梯度偏置（+0.34·(1-y/N)）是"从上边缘先烂"的直接翻译 —— 没有它，红斑
-   会四面八方同时冒出来，那是"溶解"不是原片那种"从上面糊下来"。
-   ★ 遮罩是**底色同色**的，画在纸上（clip 到纸的形状）。
-   ★★ 2026-10-07 改：原来这里写着"不能用 destination-out —— 主画布在纸之前已经
-   贴过 backdrop 了，擦会把背景一起擦穿"，那句**在当时是对的**。现在纸走的是
-   自己的层（#cvup），擦它不碰底下任何东西，所以 drawSheet 已经改回真擦。
-   颜色因此成了**死数据**（destination-out 只看 alpha 通道），留着只为把 scratch
-   打印出来时肉眼看得到"啃到哪儿了"。
-   ★ 底色取 P.bg 不写死：?bg= 换底色时遮罩得跟着变，否则红斑是上一个颜色的。
-   （这条现在不影响画面，但改回"盖色"那套时立刻就有意义，留着。）
-
-   ★ 这里用 Math.random() 不用 rnd()：rnd() 是带种子的全局序列，在这儿抽几十万次
-   会**把纸的出生顺序整条挪掉**（seed 相同时前后两次跑出的纸不一样，就没法做
-   A/B 对照了）。遮罩是纹理，不需要可复现。 */
+/* 消散使用三层 fbm 噪声和向上梯度偏置 .55·(1−y/N)。
+   复用 scratch 按连续阈值更新 alpha，独立 #cvup 通过 destination-out 擦除。
+   纹理不消耗几何 rnd，颜色仅用于调试。 */
 var DSNOISE = 192;            // 噪声场的边长（也是遮罩的边长）
 var DSW = 0.16;               // 软边宽度（归一化单位）—— 晕染的边是渐的不是刀切的
 var DS0 = 1.05, DS1 = -0.29;  // 消散进度 0 / 1 对应的阈值（1.05 一点不吃，-0.29 全吃）
@@ -992,9 +759,7 @@ function dsInit(){
       var t1 = A[i1*m+j0] + (A[i1*m+j1] - A[i1*m+j0])*u;
       v += (t0 + (t1-t0)*w2) * L.w;
     }
-    /* ★ 上边缘先烂。0.34 是试出来的下限失败值（出过图）：那么弱的时候
-       fbm 自己的起伏完全盖过它，红斑从纸**中间**几个点冒出来、往四周扩，
-       是"溶解"不是原片那种"从上面糊下来"。0.55 才把它压成明确的"上→下"。 */
+    /* 梯度偏置 .55 使消散从上向下推进，强于 fbm 的局部起伏。 */
     v += 0.55*(1 - y/N);
     f[y*N+x] = v;
     if (v < lo) lo = v;
@@ -1010,9 +775,7 @@ function dsInit(){
   dsIM = dsG.createImageData(N, N);   // 复用一份，别每帧 create（147KB×60/s 全是 GC 垃圾）
 }
 
-/* 按当前进度现算一张遮罩，写进复用的 scratch。
-   p = 消散进度 0..1 → 阈值从 DS0 滑到 DS1。**插值必须发生在这里**：
-   写成"两张各带 globalAlpha 叠一叠"是错的，alpha 是乘性的（见上面那段注释）。 */
+/* dsMaskAt 按进度在 DS0/DS1 间插值阈值，再生成单张 alpha 遮罩。 */
 function dsMaskAt(p){
   if (!dsF) dsInit();
   var N = DSNOISE, f = dsF, rgb = dsRgb, d = dsIM.data;
@@ -1028,16 +791,12 @@ function dsMaskAt(p){
   return dsScratch;
 }
 
-/* 纸的四个屏幕角点 —— drawSheet / hitSheet 共用一份。
-   ★ 抽出来是因为拖拽的命中判定必须跟画出来的形状**逐像素同源**：
-     分开写两遍的话，改一处忘一处，"点了没反应/点空白也抓到"就会冒出来。 */
+/* drawSheet()/hitSheet() 共用纸的四个屏幕角点，保持绘制与命中几何一致。 */
 function sheetQuad(s){
   var N = Math.max(6, P.rays)|0;
   var span = clamp(P.pSpan|0, 1, N-1);
   var g = sheetGeom(s), r0 = g[0], r1 = g[1];
-  /* 纸边从棱线往内收 P.pEdge 像素。收的是**角度**，所以要按半径换算：
-     同一个角度偏移在 r0 处和 r1 处的像素数不一样，用中段半径才能让整条边
-     看上去是平行地贴着棱线的。 */
+  /* P.pEdge 以中段半径换算角度内收量，使纸边贴近而不覆盖棱线。 */
   var rmid = Math.max((r0 + r1)/2, 1);
   var half = (span/N)*6.283185307/2 - P.pEdge/rmid;
   var a0 = s.th - half, a1 = s.th + half;
@@ -1046,24 +805,13 @@ function sheetQuad(s){
            [VP.x + c1*r1, VP.y + n1*r1],
            [VP.x + c1*r0, VP.y + n1*r0],
            [VP.x + c0*r0, VP.y + n0*r0]];
-  /* 被手拽着 → 从上面那个透视梯形**转正**成一张正对我们的纸（face 0→1）。
-     正对 = 没有透视收缩 = 规整的矩形：长边沿它原来"径向"的方向（u），
-     短边沿切向（v）。四点顺序跟上面一一对应（外-v → 外+v → 内+v → 内-v），
-     所以过渡就是单纯的四点插值，纸自己会转过来，不需要额外的旋转逻辑。 */
+  /* face 从 0 到 1，将井壁透视梯形插值为正面矩形，供正文排版。 */
   var hv = 0, hh = 0;                 // 只有转正（k>0）之后才有"正对我们的框"
   var k = s.face || 0;
   if (k > 0){
-    /* 目标是**屏幕轴对齐**的矩形（横平竖直），边长 = 按下时冻结的 fw/fh × pZoom。
-       ★ 不是"沿它自己径向的那个矩形"：用户 2026-10-07 明确要横平竖直，因为这张纸
-       最终要在上面排文字段落，斜的排不了版。
-       ★ 四个角怎么配 —— 极坐标那四点本来就是**环绕有序**的（q0→q1→q2→q3 绕着纸心
-       走一圈，方向跟矩形四角的环绕方向一致），所以只需要决定**从哪个角起步**。
-       四种起步各算一遍总位移，取最小的：交叉的配对位移必然大得多，最小值就是
-       那个不扭的。写死"q0→右上"不行 —— 纸在左半时 q0 落在屏幕左下，写死会让
-       四个角在插值途中互相穿过（纸扭成麻花，而且不报错）。 */
-    /* ★ 横纵各一个倍数（zx / zy），不再共用一个 pZoom —— 见 P.pfs 那段：
-       纸的宽高要由"这段文字排出来是几行"决定，两个方向就得能各自定。
-       zx 还兼着"拉扯"（puff 只横向抻）—— 纸被抻开时字跟着抻，那是对的。 */
+    /* 转正目标为轴对齐矩形，尺寸由按下时冻结的 fw/fh 计算。
+         遍历四种同序角点对应，选总位移最小方案，避免插值时交叉扭转。 */
+    /* zx/zy 独立追踪目标宽高，按段落排版结果决定。 */
     hv = s.fw/2*(s.zx || P.pZoom)*(1 + (s.puff||0));
     hh = s.fh/2*(s.zy || P.pZoom);
     /* 矩形四角：0 上左 · 1 上右 · 2 下右 · 3 下左（屏幕 y 向下时的顺时针） */
@@ -1085,7 +833,7 @@ function sheetQuad(s){
       q[i][1] += (ry[j] - q[i][1])*k;
     }
   }
-  /* hv/hh 一并给出去：纸上排字要用**同一个框**（drawSheet 里不再另算一遍，
+  /* hv/hh 一并给出去：纸上排字要用同一个框（drawSheet 里不再另算一遍，
      否则两处的公式迟早会漂）。face=0 时它们是 0，那时纸还是斜的，本来也不排字。 */
   return { r0:r0, r1:r1, q:q, hv:hv, hh:hh };
 }
@@ -1116,67 +864,37 @@ function hitSheet(px, py){
   return null;
 }
 
-/* 被手拽着的那张纸怎么走：**在屏幕坐标上跟手**，同时把自己**转正**。
-   ★ 2026-10-07 用户纠的正是这里 —— 上一版让它在极坐标里跟手挪（改 th 和径向
-   偏移），读起来就是"在井壁上滑"，永远是一张斜的梯形，没有"被拉到前面来"这回事。
-   原片那句字幕是「它就会移动到我们的屏幕前面」：移到**前面** = 脱离井壁、转正。
-   所以位置落在屏幕 x/y 上，形状交给 face（0 = 贴在井壁的透视梯形，1 = 正对我们
-   的矩形，混合在 sheetQuad 里）—— 两件事分开做，纸就自然地浮起来、转过来。 */
+/* 纸心以屏幕 x/y 跟手，face 独立控制由井壁梯形转向正面矩形。 */
 function stepHold(s, dt){
   var h = s.hold;
   if (!h) return;
-  /* 抓的是**偏移**不是绝对位置：按住那一刻纸心在指针的 (h.ox, h.oy) 处，之后一直
+  /* 抓的是偏移不是绝对位置：按住那一刻纸心在指针的 (h.ox, h.oy) 处，之后一直
      保持这个相对关系 —— 手往哪儿甩纸都不跳（跳是"按下瞬间纸瞬移到指针底下"那个
      老毛病）。跟手用指数滤波、按 dt 折算：固定比例会让手感随帧率变（同 follow）。 */
   var tX = pointer.x - h.ox, tY = pointer.y - h.oy;
   s.fx = follow(s.fx, tX, P.pfol, dt);
   s.fy = follow(s.fy, tY, P.pfol, dt);
   s.face = follow(s.face || 0, 1, P.pFace, dt);
-  /* 转正到一定程度才抽（用户：「井里面纸正对时会抽一段」）——纸还是斜梯形
-     的时候字没法排，而且那会儿也看不出抽了什么。抽了就定死在这张纸上。 */
+  /* 转正到一定程度才抽（纸还是斜梯形的时候字没法排，而且那会儿也看不出抽了什么）。
+     抽了就定死在这张纸上。 */
   if (!s.pick && s.face >= P.pick) pickFor(s);
   /* 抽中之后纸往目标尺寸长。用 follow 不用瞬时赋值：它是"摊开"给我们看的，
      跳大就成了弹窗。宽高各追各的（见 sheetQuad 那段）。 */
   if (s.tzx) s.zx = follow(s.zx, s.tzx, P.pgrow, dt);
   if (s.tzy) s.zy = follow(s.zy, s.tzy, P.pgrow, dt);
-  /* 「拉扯」：滤波的**滞后量**正比于手的速度（追不上多少 = 手有多快），拿它当速度
-     的代理 —— 拖得快纸就被抻开一点，手一停立刻收回。
-     ★ 单位是**像素**（屏幕上的滞后距离），除以 P.pPuff 才换成比例。
-     ★★ 2026-10-07 用户「你这字怎么扁扁的」之后重定的两个数，都是在**真鼠标**上
-     量出来的（scripts/paper-check.py ③ 边拖边采峰值 —— puff 手一停就归零，
-     拖完再读永远是 0，那种写法看着像在验其实什么都没验）：
-
-         手速            旧（pdiv 300 / 上限 0.45）   新（1120 / 0.10）
-         慢慢挪 105px/s      字宽 +1%                      +1%
-         正常拖 1363px/s     字宽 +15%                     +4%
-         甩一下 6108px/s     字宽 +37%                     +10%
-
-     判据是「**正常拖**的时候字不能看得出变形」。旧值下随手一拖就有 15%，
-     那不是"拉扯"，那是字在变形 —— 而 puff 是只横向抻的，纸上的字跟着一起抻。
-     新值下那股"被拉"的劲儿还在（纸的**外廓**照样随速度变宽），但字基本不动。
-     ★ 为什么不让"纸抻、字不抻"：那要给 drawPaperText 另开一条不含 puff 的
-     宽度公式，于是"字和纸严丝合缝"这条不变式就有两个版本了 —— 迟早漂。
-     压小幅度只需要改一个数，且保住了一条公式。 */
+  /* 用跟手滤波的滞后距离估计拖速，除以 P.pPuff 换算横向拉伸。
+     当前分母 1120、幅度上限 .10；纸与文字共用变换，保持贴合。 */
   var lx = tX - s.fx, ly = tY - s.fy;
   s.puff = follow(s.puff || 0,
                   clamp(Math.sqrt(lx*lx + ly*ly)/P.pPuff, 0, P.pmax), 8, dt);
 }
 
-/* 把抽到的那一段排到纸上。
-   ★ 坐标系：排版结果是**终态**的屏幕尺寸（lay.w × lay.h），而纸此刻可能还
-     没长到位、还可能被拉扯抻开 —— 所以用一次 scale 把"终态坐标"映到"此刻
-     的框"上。终态时 sx = sy = 1（因为 tzx/tzy 就是按这个框反推的），不需要
-     额外判断"长没长到位"。
-   ★ 过渡途中 sx ≠ sy，字会被轻微非均匀缩放 —— 只在拉起来那零点几秒里，
-     换来的是"字和纸永远严丝合缝"。反过来（字号固定、纸自己长大）会看到
-     纸在长、字不动，那才是真的错。
-   ★ 字画在 `poly(q, C.paper)` **之后**、消散擦**之前** —— 于是用户松手时，
-     destination-out 把纸和字**一起**啃掉，一个字的效果代码都不用加。 */
+/* 正文按最终 lay.w/lay.h 排版，再缩放到当前纸框；终态 sx=sy=1。
+   文字在纸填色之后、消散之前绘制，使擦除同时作用于纸和正文。 */
 function drawPaperText(s, hv, hh){
   var L = s.lay;
   if (!L || !s.pick) return;
-  /* 淡入：纸还是斜梯形时压一块横平竖直的字，看着像字浮在纸外面
-     （这个坑在别处见过近亲）。0.60→0.92 之间淡进来。 */
+  /* 转正进度 .60→.92 时淡入正文，避免文字过早浮在斜纸之外。 */
   var a = clamp((s.face - 0.60)/0.32, 0, 1);
   if (a <= 0.01) return;
   var sx = (2*hv)/L.w, sy = (2*hh)/L.h;
@@ -1200,12 +918,7 @@ function drawPaperText(s, hv, hh){
   ctx.restore();
 }
 
-/* ?hold= 的驱动（见 FR 那段注释）。保证场上有一张"被拿着的"纸，且它的
-   位置 / 转正程度每次都被写死。
-   ★ 必须在 stepHold **之后**、每帧的最后跑 —— 否则 stepHold 里那两条 follow
-     会把 face 拽向 1、把 fx/fy 拽向 pointer，定格就定不住。
-   ★ fw/fh 在这里补：正常路径是"按下那一刻"冻结的（见 pointerdown），
-     ?hold= 没有那一刻，就用"长到头之后"的几何算一遍 —— 同一套式子。 */
+/* ?hold= 每帧在 stepHold 后覆盖位置和转正量，缺省 fw/fh 由终态几何补算。 */
 function freezeHold(){
   var s = sheets[0];
   if (!s){ s = spawnSheet(); if (!s) return; }
@@ -1219,14 +932,7 @@ function freezeHold(){
   }
   s.fx = frX(); s.fy = frY();
   s.face = FR.face;
-  /* ★ 把「拉扯」归零。不归零的话这个探针**出的图是假的**，而且假得不显眼：
-     stepHold 每帧仍在跑，它的目标位置是 pointer（定格时停在 0,0），而纸心被
-     钉在屏幕中央 —— 于是"跟手滞后量"永远拉满，puff 卡在夹子上限 0.45。
-     而 puff 是**只横向抻**的（hv 里那个 (1+puff)），字跟着一起抻：
-     量出来 sx 1.45 × sy 1.00，也就是纸上每个字被横向拉了 45%，
-     看着就是"字怎么扁扁的"。而纸的长宽其实早就长到位了（zx=tzx、zy=tzy）。
-     定格的语义是"纸在手上、已经稳住了"，那就该是 puff=0 ——
-     手真在甩的时候才该有那个滞后。 */
+  /* 定格时将 puff 归零，表示纸在手中静止，避免跟手滞后继续拉伸正文。 */
   s.puff = 0;
 }
 
@@ -1237,28 +943,8 @@ function drawSheet(s){
   drawPaperText(s, Q2.hv, Q2.hh);         // 抽到的那一段（见上）
   /* 消散：不是淡出，是红斑把纸啃掉（见 dsInit 上面那一整段）。 */
   if (s.dying > 0){
-    /* 一张遮罩搞定，globalAlpha 保持 1 —— 进度已经烧进遮罩的 alpha 里了。
-       ★ 遮罩是**屏幕轴对齐**的：不随纸的角度转。它表达的是"红斑从上方啃进来"
-       这件屏幕上的事，而纸的 θ 出生后就定死了（见 spawnSheet），两者互不干扰。
-
-       ★★ 2026-10-07 用户：「纸的晕染消失怎么留下的红色遮罩，不应该是透明吗，
-       露出后面的东西」—— 对的，这一版之前是拿**底色同色**的红盖上去，所以纸
-       "消失"的最后那块是**一片没有棱线的纯红**，而纸跨了 6 条棱线（pSpan=6），
-       在满屏放射线里就是一块秃斑。实测（_logs/_papermask.py）：纸的矩形里
-       深色像素 0 个，纸来之前/走了之后同一块都是 9.8% —— 那几条线是**整段
-       缺失**的，直到纸被删掉那一帧才一起跳回来。
-
-       当时的理由是「擦会擦穿」：纸和井壁在**同一张** canvas 上，destination-out
-       把纸擦掉的同时也把底下的 backdrop 擦了，露出 canvas 下面的页面底色
-       （见 dsInit 里那条 :625 的旧注释）。现在纸画在自己的层（#cvup）上 ——
-       擦掉的只是这一层的像素，下面 #cv（井壁+棱线+井里的字）和 #exit 原封不动。
-       同一个动作这才成立。
-
-       ★ 前提：**这一段只在 #cvup 上跑**。井里那些纸画在主 canvas 上，而它们
-       永远不晕染（dying 只在 release() 里设，release 只对拿起的纸生效），
-       所以走不到这儿。哪天要把晕染搬回主 canvas，先回来读这一条。
-       ★ 遮罩只用到 alpha 通道，颜色无所谓 —— dsMaskAt 里填的底色现在是死数据，
-       留着是为了把 scratch 打印出来时肉眼看得到"啃到哪儿了"。 */
+    /* 消散仅在独立 #cvup 执行 destination-out，globalAlpha 保持 1，进度写入遮罩 alpha。
+         遮罩按屏幕轴对齐；底层井壁、文字和出口不受擦除影响。 */
     var M = dsMaskAt(s.dying/P.die);
     var x0 = Math.min(q[0][0],q[1][0],q[2][0],q[3][0]),
         y0 = Math.min(q[0][1],q[1][1],q[2][1],q[3][1]),
@@ -1273,31 +959,18 @@ function drawSheet(s){
       ctx.lineTo(q[3][0], q[3][1]);
       ctx.closePath();
       ctx.clip();                          // 遮罩只在纸的形状里生效
-      /* 真擦。擦掉的地方是**透明的**，合成时露出下面那一层的东西（理由见上）。 */
+      /* 真擦。擦掉的地方是透明的，合成时露出下面那一层的东西（理由见上）。 */
       ctx.globalCompositeOperation = "destination-out";
       ctx.drawImage(M, x0, y0, x1-x0, y1-y0);
       ctx.restore();                       // restore 会把 composite 一起还原
     }
   }
-  /* ★ 这里**不**补画纸的边界棱线（2026-10-07 改）。补画过两版，两版都不对：
-     骑在纸边上 → 一半落在纸外，被抗锯齿摊成比周围 95 条淡得多的痕迹；
-     挪进纸内 2px → 看得见了，但它成了"给纸描的一条边"，出纸就断 ——
-     用户的评价是「纸边缘怎么上面有黑线，你是对不齐吗」。
-     现在靠 P.pEdge 把纸收窄，棱线**自己**完整地留在纸外，只有 r0..r1 那一段
-     被纸压住。一条线从画面外穿进来、中间被纸压着的读法才对。 */
+  /* 不额外描纸边，由 P.pEdge 内收保留原棱线，避免断线或抗锯齿浓度差异。 */
 }
 
 function stepSheet(dt){
-  /* 出生**只按定时器**，不按"场上还差几张"补位。用户 2026-10-07：
-     「请均匀的放纸，而不是一阵一阵的，很怪」。
-     ★ "一阵一阵"是怎么来的：上一版是"到点 + 有位子"两个条件同时成立才生。
-     三张纸间隔 1.15 秒落（寿命约 4.6 秒），第三张一落场上就满 3 —— 于是下一张
-     要等**第一张死**，出生间隔当场变成 1.15 / 1.15 / 2.31 / 1.15 / 1.15 / 2.31…
-     周期性冒出一个双倍空档，看上去就是"一阵一阵"。
-     现在把 gap 调到和寿命相称（寿命 ≈ 4.6s，gap 1.85 ⇒ 场上恒定 2~3 张），
-     P.n 只当保险丝，正常跑不到。
-     ★ 入场闸（spawnSheet 里的 demoT < P.wt）返回 null 时**不重置**计时器，
-     否则入场一结束要白等一个 gap 才出第一张。 */
+  /* 按 gap 均匀出生，P.n 仅作数量上限。寿命约 4.6s、gap=1.85s 时保持 2~3 张。
+     入场未完成导致 spawnSheet 返回 null 时不重置计时，放行后立即生成。 */
   /* ?hold= 定格时不再生新的：探针要的是"就那一张"，多出来的纸会挤进画面
      挡住判读（它们是完整画出来的，不是幽灵）。 */
   if (!FR){
@@ -1307,13 +980,7 @@ function stepSheet(dt){
       else sheetQ = 0;
     }
   }
-  /* 内端滑出画面才算走完。用内端不用外端：外端早就出画了，拿它判会把纸
-     按在画面边缘多留一秒。
-     ★ 这个数要按**最宽的那一边**（半宽 W/2=720）定，不能按半高（450）：
-     朝左右飘的纸在 r=450 时还看得见一大块，按 450 判就是"纸还在画面里就淡出了"。
-     取 0.50·max(W,H) = 720（1440 下）—— 正好是半宽，朝正右的纸内端刚好压到右边缘。
-     ★ 它同时是**纸能长到多大**的上限：纸在近处必然大（屏幕尺寸 ∝ 半径），
-     所以"纸太大"这个抱怨唯一的解法就是让它早点走完。0.55→0.50 是为这个收的。 */
+  /* 纸以内端滑出屏幕判完成，半径上限取 .50·max(W,H)，避免仍可见时提前消失。 */
   var kill = Math.max(W,H)*0.50;
   for (var i=sheets.length-1;i>=0;i--){
     var s = sheets[i];
@@ -1324,10 +991,7 @@ function stepSheet(dt){
     }
     if (s.held){ stepHold(s, dt); continue; }   // 被手拽着：不生长、不判 kill
     s.t += dt;
-    /* ★ 滑出画面**直接删**，不再走一遍淡出（2026-10-07 改）。
-       那 0.5 秒淡出是给"晕染消失"占位用的；晕染只属于**被手拉过的纸**——
-       松手那一下的收尾。自己飘出画外的纸已经看不见了，再淡一遍纯属浪费，
-       而且它会在画面边上留一段半透明的纸（原来那个 0.5 秒就是这么来的）。 */
+    /* 自行滑出画面的纸直接删除；晕染仅用于被拿起后松手的纸。 */
     if (sheetGeom(s)[0] > kill) sheets.splice(i,1);
   }
 }
@@ -1337,43 +1001,17 @@ var cards = [], spawnQueue = 0,
     pointer = {x:0,y:0,down:false,card:null,sheet:null,px:0,py:0,vx:0,vy:0,has:false};
 
 function spawn(x){
-  /* ★ 入场没走完，井里一本都不放。
-     原来页面一加载就 spawn 了 P.n 本，它们跟字**同时**从灭点往外长 —— 等 2.2 秒
-     的入场看完，书早就飞到眼前了，看到的是"画面里本来就有几本大书"，而不是
-     "书从井口的那个小点掉过来变大"。
-     ★ 闸设在 spawn() 里，不在 step() 里：spawn 有三个调用点（初始化那一串、
-     补书、?auto=1 的演示定时器），漏掉任何一个都会造出一堆静止的书钉在画面上。
-     ?wt=0（关入场）时 demoT=0 也不小于 0，这一条恒不成立 —— 于是初始化那一串
-     仍然照放，?t=0&wt=0 那类探针（书要钉住不动才好量）不受影响。 */
+  /* 入场完成前 spawn() 不生成书，覆盖初始化、补书和自动演示三条入口。
+     ?wt=0 跳过入场时仍允许初始生成。 */
   if (demoT < P.wt) return null;
-  /* ★ 出生在**井口**（灭点）。2026-10-06 用户两条：「你给我的画面甚至是包括了
-     外面的一些，太奇怪了」+「照片是从井口出现由小变大落向我们」—— 旧版出生在
-     y=-H*0.62（投影后在画面上方**外面**），卡片是从画框外钻进来、只露半截，
-     那不是井里的东西。
-
-     现在：世界坐标 x/y 都贴近 0（投影后就落在消失点那个小圆里），z 取**负**
-     —— z 是朝观察者的正方向，负 z 就是井底深处，投影系数 k=persp/(persp−z)
-     远小于 1，于是它一开始只是个极小的点，一路飞来才长大。 */
-  /* 出生散布：世界坐标 ±0.20W，出生时 k≈0.27，投影后只有 ±39px —— 落在井口那个
-     86px 的圆里，看着确实是"从井口出来"。这里给的是世界坐标，投影时还要乘 k，
-     所以出生看着聚在井口，飞到眼前才自然拉开。
-     为什么不是旧版的 0.36W：那时 5 张卡片**同时**出生、又没有初速，散布窄会糊成
-     一团（实测投影后挤在 56px 里）。现在一本本落（gap）且各有横向初速，糊不起来；
-     而 0.36W 反倒让书出生就不在井口圆里。 */
+  /* 书从井口出生：世界 x/y 接近 0、z 为负，使初始投影很小，再向观察者飞来。 */
+  /* 世界出生范围 ±.20W 经初始 k≈.27 压为井口内约 ±39px，飞近后自然散开。 */
   var c = new Card(((rnd()*1e9)|0)>>>0,
                    x===undefined ? (rnd()-0.5)*W*0.20 : x,
                    (rnd()-0.5)*H*0.12);
   c.z  = -P.z0*(0.72 + rnd()*0.56);
   c.vz =  P.vz*(0.80 + rnd()*0.40);     // 朝我们飞
-  /* ★ 往上散，**不给向下**。用户 2026-10-07：「书的落点往上左右搞，到正下方有种
-     被砸的感觉」—— 灭点正下方是那四行字，书从那儿穿过去就是砸在字上，还挡字。
-     初速取 -0.45 ~ -1.0 倍 svy（书上、书下都出，但都不往下走）。
-     ★ 横向那条是**主力**，而且必须**有下限**。用户接着补了一句「砸到正中间也不要，
-     反正就是不要太到遮挡视线的地步」—— 书正对镜头飞会越变越大，最后糊在画面正中，
-     那正是井和字待的地方。让它一出生就斜着走，等它大到显眼时人已经偏到边上、
-     再往外出界。
-     ★ 用"方向 × 有下限的速率"而不是 (rnd()-0.5)：后者会随机到接近 0，正好被抽中
-     的那本书还是笔直冲镜头 —— 而它只要出一本就够挡一次视线。 */
+  /* 初速向左右和上方分散，避开下方字区；横向速率设下限，防止书迎面放大挡住中心。 */
   c.vy = -P.svy*(0.45 + rnd()*0.55);
   c.vx = (rnd() < 0.5 ? -1 : 1) * P.svx*(0.45 + rnd()*0.55);
   c.wx = (rnd()-0.5)*1.2; c.wy = (rnd()-0.5)*1.0; c.wz = (rnd()-0.5)*1.6;
@@ -1385,9 +1023,7 @@ function step(dt){
   /* 两套并存的唯一分岔口。PIN 那条预跑循环调的也是 step()，所以这里一分岔，
      预跑出来的就跟实时同一件事 —— 不用另写一遍。 */
   if (P.paper) return stepSheet(dt);
-  /* 补书。**空场时立刻放第一本** —— 入场刚走完那一刻井里是空的，要马上有东西从
-     井口出来；之后按 gap 一本本落。原来是一次性 spawn 完 P.n 本，五本同时从井口
-     冒出来在同一个位置叠成一摞，看不到"一本一本掉下来"这件事。 */
+  /* 空场立即补第一本，之后按 gap 顺序出生，避免同时塞满 P.n。 */
   if (spawnQueue > 0){
     spawnQueue -= dt;
     if (spawnQueue <= 0){ spawn(); spawnQueue = P.gap; }
@@ -1403,14 +1039,14 @@ function step(dt){
     }
     if (c.held){
       /* 跟手：位置用指数滤波追指针，速度也跟着滤 —— 松手时继承的就是
-         **滤过的**速度，不是最后一帧的差值（后者在抬手瞬间会抖）。 */
+         滤过的速度，不是最后一帧的差值（后者在抬手瞬间会抖）。 */
       var tx = pointer.x - VP.x, ty = pointer.y - VP.y;
       c.x = follow(c.x, tx, P.follow, dt);
       c.y = follow(c.y, ty, P.follow, dt);
       c.z = follow(c.z, 70, P.follow, dt);
       c.vx = follow(c.vx, (tx-c.x)*P.follow, P.follow, dt);
       c.vy = follow(c.vy, (ty-c.y)*P.follow, P.follow, dt);
-      /* 拖的时候卡片**迎着运动方向倾**，这是"有重量"最省事也最有效的一笔 */
+      /* 拖的时候卡片迎着运动方向倾，这是"有重量"最省事也最有效的一笔 */
       c.rz = follow(c.rz, clamp(c.vx*0.00028, -0.34, 0.34), 8, dt);
       c.rx = follow(c.rx, clamp(-c.vy*0.00022, -0.30, 0.30), 8, dt);
       c.ry = follow(c.ry, 0, 6, dt);
@@ -1422,93 +1058,34 @@ function step(dt){
     c.vx *= Math.exp(-P.dragX*dt);   // 横向阻力单独一个小值，见 P.dragX
     c.vy *= d;
     c.x += c.vx*dt; c.y += c.vy*dt;
-    /* z **不吃阻力**：卡片要匀速从井底飞过来，一加阻力它就停在半路上了。
+    /* z 不吃阻力：卡片要匀速从井底飞过来，一加阻力它就停在半路上了。
        阻力只作用于横向的 vx/vy。 */
     c.z += c.vz*dt;
     c.rx += c.wx*dt; c.ry += c.wy*dt; c.rz += c.wz*dt;
     c.wx *= d; c.wy *= d; c.wz *= d;
     if (REDUCE){ c.vx=c.vy=0; c.wx=c.wy=c.wz=0; }
-    /* 出界 = 扔掉了。做「魔法消失」而不是直接删，是因为那一笔才是参考里
-       被夸"细节"的地方（转到侧立、只剩一条深片）。
-       ★ 判据用**投影后的屏幕坐标**：投影中心挪到消失点之后，世界 y 和屏幕 y
-       不再只差一个常数（还差一个 k），拿 c.y 直接比会判错位置。
-       ★ 卡片现在是朝观察者飞的，所以还多一条：q[2] 就是投影系数 k，它随
-       z→persp 发散。不加这道闸，卡片的 z 越过 persp 会翻号，一帧之内把整个
-       画面糊掉（而且不报错）。
-       ★ 上限从 3.0 降到 1.8 是**照着原片量的**，不是保守起见。用户 2026-10-07：
-       「你可以看看原片，书是一直都比较小的，然后从上左右边界处离开」。抽 92~120s
-       每帧看：卡片最大那几张约占屏高 42%（900 的 378px）；而 k=3.0 时屏盒
-       647×592 = 屏高 66%，屏心离灭点只有 83px —— 就是"糊在正中间"的本体。
-       k=1.8 时书屏盒约 284×387（屏高 43%），跟原片最大那张一个量级。
-       横向飘得够快的书会先撞 q[0] 的边界出画，撞这里的只是 vx 偏小那几本。 */
+    /* 按投影屏幕坐标判出界，并限制 k≤1.8，避免接近 persp 的发散或越过相机后翻号。
+         达到边界后转入消散，而非直接删除。 */
     var q = proj([c.x, c.y, c.z]);
     if (q[0] < -W*0.31 || q[0] > W*1.31 || q[1] > H*1.35 || q[2] > 1.8) c.dying = 0.001;
   }
 }
 
-/* ── 背景：一口井 ──────────────────────────────────────────────────
-   用户原话：「他的背景通过线条和字构建出一种立体状态，就好像这是个井口」，
-   并且「下面的那个字也是立体的一部分」。拆成三件事 —— 但**必须共用同一个
-   消失点**，各用各的就是两层贴纸，一眼穿。
-
-   全部尺寸来自原片实测（_logs/_wod/_x/full_00107.1.png，1280×720）：
-
-   1) 井壁的棱线。从消失点全向发散的放射线。"中心密、边缘疏"不用另做 ——
-      屏幕上相邻两条线的间距本来就是 r·dθ，随 r 线性变大。原片里粗细**不一**：
-      绝大多数是细线，少数明显更粗；均匀的线看着像量角器，几根粗的才像结构。
-
-   2) 远端那个洞。消失点处一个比周围亮的圆，**线不穿过它**。放大看半径约
-      22px（0.031H），里面还落着几颗碎石。
-
-   3) 四行字，沿消失点正下方的轴。实测：
-
-        行      y 中心  距消失点   行距          字高
-        CODING   359.5   103.5      —            24
-        MY WAY   395.5   139.5   36  (×2.14)     44
-        SINCE    472.5   216.5   77  (×1.87)     58
-        1997     616.5   360.5  144  (×1.87)    172
-
-      **行距和字高都是每行翻一倍。** 拟合 d(j) = 72.5 + 36·2^j，四行全中。
-      这不是挑出来的曲线：等比靠近相机，屏幕上的 k 就按 2^j 走，而字高 ∝ k、
-      行距 ∝ Δk ∝ k，两条同时成立。所以下面直接写 pow(2,j)，换行数不用重调。
-      字是**单层实心**（放大 3 倍核过，没有叠影），向右倾。
-
-   配色没有照抄原片。原片是**亮井壁 + 深色刻字**；这里是深蓝的夜，反过来做：
-   配色是照原片量的（_logs/_fxt_ref.py），不是照感觉调的：
-     底    #F40B3E   纯粹的鲜红
-     棱线  #B5001E   只比底暗一档的暗红，**全部 1px**、同色、不透明
-     字    #150001   纯黑
-     灭点  那里什么也没画 —— 看着像个"亮盘"，其实是**棱线不穿过去**造成的：
-           周围密布线所以显暗，中间干净所以显亮。在那里加光晕是反的。
-   立体感全部来自"所有棱线汇聚于一点"这一个事实，颜色只是陪衬。
-   （早先凭印象定了深蓝底 + 蓝白光晕 + 粗细混搭的线，出图是一团宇宙星光。） */
-/* 井是**静态的**：底色、棱线、那四行字，一秒里一个像素都不会变。所以整口井
-   只画一次到离屏 canvas，之后每帧一次 drawImage 贴回来。
-
-   ★ 这不是提前优化。加了纵向透视之后每个字要切成 ~35 条横带（4 行 × 6 字
-   × ~35 ≈ 每帧 800 次 clip+fillText，每个字还要栅格化 240×5px），而它压根
-   不变 —— 每帧重做纯属白烧。判据：wellArt 里没有一个字用到 t。 */
-/* 井壁一层、字一层，**分开缓存** —— 因为纸要夹在中间。
-   ★ 为什么非要夹：纸的左右两条边正好落在两条棱线上（"被某两条黑线约束"），
-   所以棱线必须画在纸**上面**那条边才看得见。都烘在一张里的话，纸压棱线，
-   屏幕上就是"一块浮着的白"，用户 2026-10-07 的原话是「纸现在真的是被两个
-   黑线约束吗，边界不在黑线上啊」—— 他要看见线。
-   顺序：backdrop（背景+棱线）→ 纸 → textLayer（字）。字仍在最上面，
-   所以纸永远不会压字，这一条不靠角度让位也成立。 */
+/* 井由共用灭点的放射棱线与四行透视字构成。底色 #F40B3E、线 #B5001E、字 #150001。
+   棱线使用同色 1px 线且不穿过井口；中心亮区由留空形成，不叠加光晕。
+   行距与字高约逐行倍增，具体几何由下方文字投影计算。 */
+/* 终态静态背景和文字缓存到离屏 canvas；入场变化期间改走动态重绘。 */
+/* 背景与文字分开缓存，使场景中的纸位于文字下方；棱线另在纸上重画。 */
 var wellCv = null, textCv = null;
 
-/* 把 drawFn 画进一张全屏离屏 canvas，再贴回主 canvas。slot 选缓存槽。
-   缓存按**设备像素**开（W*DPR），内部坐标系也乘 DPR —— 跟主 canvas 一套。
-   开成 W×H 的话，贴回来时被主 ctx 的 DPR 变换放大，整口井糊一倍。 */
+/* 离屏缓存按 W*DPR 建立，内部按 DPR 缩放，尺寸变化时失效重绘。 */
 function layer(slot, drawFn){
   var bw = Math.round(W*DPR), bh = Math.round(H*DPR);
   var cv = slot === "text" ? textCv : wellCv;
   if (!cv || cv.width !== bw || cv.height !== bh){
     cv = document.createElement("canvas");
     cv.width = bw; cv.height = bh;
-    /* 这几层都是照着外层的 ctx 写的，这里临时把它指到离屏上。
-       finally 是必需的：漏了还原，整页会静默画进那块看不见的 canvas，屏幕上
-       只剩一片黑，而且不报任何错。 */
+    /* 临时切换全局 ctx 到离屏画布，必须通过 finally 恢复。 */
     var outer = ctx;
     try {
       ctx = cv.getContext("2d");
@@ -1517,23 +1094,19 @@ function layer(slot, drawFn){
     } finally { ctx = outer; }
     if (slot === "text") textCv = cv; else wellCv = cv;
   }
-  /* ★ 目标尺寸显式写 W,H。主 ctx 已经被乘了 DPR，只写 (0,0) 的话 drawImage 会
-     拿源的**像素**数当 CSS 单位用，整口井被放大 DPR 倍。 */
+  /* 目标尺寸显式写 W,H。主 ctx 已经被乘了 DPR，只写 (0,0) 的话 drawImage 会
+     拿源的像素数当 CSS 单位用，整口井被放大 DPR 倍。 */
   ctx.drawImage(cv, 0, 0, W, H);
 }
 
-/* 底层 = 背景 + 光晕 + **全部**棱线。中间那几条棱线就该被纸盖住 ——
+/* 底层 = 背景 + 光晕 + 全部棱线。中间那几条棱线就该被纸盖住 ——
    压在纸上的只有纸自己的两条边界，那两条由 drawSheet 单独重画。 */
 function backdrop(){ layer("well", function(){ wellArt(1, false); }); }
 function textLayer(){ layer("text", function(){ wellText(1); }); }
 
-/* prog：入场进度 0..1，不给就是终态。
-   ★ 井原来是**静态**的（draw 里一个像素都不变），所以整口井只画一次到离屏、
-   之后每帧一次 drawImage。入场把这条打破了 —— 线和字每帧都在动 —— 所以
-   入场那两秒走的是每帧重画的另一条路（见 frame）。代价用降精度抵掉
-   （见 wellIntro）。 */
+/* prog 为入场进度，缺省终态；入场阶段用 wellIntro() 动态重画，终态使用缓存。 */
 /* 背景 + 光晕。最底的一层，纸和棱线都画在它上面。
-   从 wellArt 里抽出来，是因为棱线要挪到**纸上面**去（见 wellRays 与 frame）。 */
+   从 wellArt 里抽出来，是因为棱线要挪到纸上面去（见 wellRays 与 frame）。 */
 function wellBase(){
   ctx.fillStyle = P.bg; ctx.fillRect(0,0,W,H);
   /* 可选的光晕。默认关 —— 见 P.hole 那行的注释。 */
@@ -1549,14 +1122,7 @@ function wellBase(){
   }
 }
 
-/* 井壁的棱线。全部 1px、同色、不透明 —— 原片就是这样。
-   早先混了 2.6px 的"粗线"还加了蓝白光晕，出图整个是"宇宙星光"：
-   粗细和颜色一有变化，眼睛就读成"发光体"而不是"一堵墙上的经线"。
-   ★★ 它**不进 backdrop 那张缓存**，而是每帧重画一遍、画在纸**上面**。
-   这是"被某两条黑线约束"唯一看得见的排法：纸的左右两条边正好落在第 i 与
-   第 i+span 条棱线上，棱线要是被纸压住，屏幕上就只剩"一块浮着的白"——
-   用户 2026-10-07 的原话是「纸现在真的是被两个黑线约束吗，边界不在黑线上啊」。
-   96 条 1px 线的重画成本远低于一次全屏 drawImage，不值得再为它开一层缓存。 */
+/* 棱线保持 1px 同色不透明，在纸之后重画，保留夹住纸边的连续结构线。 */
 function wellRays(prog){
   if (prog === undefined) prog = 1;
   if (!(P.rayA > 0)) return;
@@ -1564,10 +1130,7 @@ function wellRays(prog){
   var holeR = Math.min(W,H)*0.048;
   var N = Math.max(6, P.rays);
   var len = Math.sqrt(W*W + H*H)*1.35;
-  /* 入场：**内端**从画布外收进来，外端一直钉在画布外 —— 看上去就是"线从
-     四面八方向中间进发"。所有内端停在同一半径 holeR*0.9 上，那个圆就是井口；
-     它不是我另外画的一个圆，是线收完的自然结果。
-     棱线在字出来之前就该就位，所以它只占总进度的前 55%，两条时间线叠一段。 */
+  /* 入场棱线内端从画布外收至 holeR*.9，外端始终在画布外；井口由线端留空形成。 */
   var pr = clamp(prog/0.55, 0, 1);
   ctx.lineWidth = 1;
   ctx.strokeStyle = P.line;
@@ -1599,58 +1162,28 @@ function wellArt(prog, withText){
   if (withText) wellText(prog);
 }
 
-/* 入场那两秒专用的井。线和字每帧都在动，用不了离屏那张缓存，只能每帧重画。
-   重画的大头是字被切成 NS 条（终态量到 145 条上下，见探针 geo.nsMax）。动的时候
-   1px 的台阶看不出来 —— 整行正在位移和缩放 —— 所以临时把 P.step 放大 3 倍，
-   条数降到 1/3，重画成本也就降到 1/3。
-   ★ 必须 try/finally 还原：P.step 是全局参数，漏还原的话入场结束后整页的字会
-     一直带着粗台阶，而且不报任何错。 */
+/* 入场动态重画临时将 P.step 放大三倍，减少透视横带数量。
+   try/finally 恢复全局参数，保证终态精度。 */
 function wellIntro(prog){
   var st = P.step;
   P.step = st*3;
   try { wellArt(prog); } finally { P.step = st; }
 }
 
-/* 井里那几行字。和"画几行字"的差别是：**宽度和高度是两条独立的线**。
-   原片实测（逐行数像素，见 _logs/_fxt_ref.py）：
-     行        距灭点   字高   字宽
-     CODING    103.5     21    174
-     MY WAY    139.5     42    292
-     SINCE     216.5     82    302
-     1997      360.5    168    360
-   字高 21→42→82→168 是**严格的 ×2**，行距 36→77→144 也 ≈ ×2。
-   但字宽只从 174 涨到 360（2.07 倍），**远慢于 ×2**。
-   所以每一行都被**纵向拉伸**了，越靠下越狠 —— 1997 那行的 "9" 在屏幕上是个
-   窄高的椭圆，比正常字形高两倍多。这不是特效，是"字贴在井壁上"该有的样子：
-   横向随距离缩，纵向随深度拉。做成等比就完全没有井的感觉（上一层图里 SINCE
-   宽到 527，原片是 302，一眼就不是一个东西）。
-   所以下面不拿"字号"驱动，改成**宽度和高度各给一个目标值**：targetW 由
-   P.w0·P.kwq[j] 定，cap 由 P.cap0·2^j 定，字号去凑宽度，剩下的缺口由 ky 拉出来。
-   ★ 宽度**不再**跟着 kz=2^j 走 —— 理由见 P.kwq。 */
+/* 文字分别确定目标宽与 cap 高：targetW=P.w0·P.kwq[j]，cap=P.cap0·2^j。
+   字号匹配宽度，ky 补足高度，使字形与行距按设定透视展开。 */
 function wellText(prog){
   if (prog === undefined) prog = 1;
   var L = P.lines, n = L.length;
   var cap0 = H*P.cap0;           // 最远那行的字高 —— 原片 21/720
-  /* 横向**也**按高度取，乘的是 H*(16/9) 这个"等效宽度"：16:9 下它与 W 完全相等
-     （1280×720 时都是 1280），只有画面比例变了才分道扬镳。直接乘 W 的话，宽屏上
-     字板会横向拉宽而纵向不动 —— 整个字板跟着变形，而不只是变大。 */
+  /* 横向使用 H*(16/9) 等效宽度，保持不同宽高比下的字块比例。 */
   var w0   = H*(16/9)*P.w0;      // 最远那行的宽度 —— 原片 174/1280
   var y0   = H*0.1437;           // 板上最近那端离消失点多远 —— 原片 103.5/720
 
   window.__well = [];
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (var j=0;j<n;j++){
-    /* ── 入场：整块字板从灭点长出来 ──────────────────────────────
-       棱线先收（它占前 55%），字等它收到一半才起步。
-       ★★ **位置和尺寸乘同一个 s**，这是这段唯一要紧的一条。第一版不是这么
-       写的 —— 那版把每行沿深度往回推（zj -= persp*zback*(1-pe)），听着更"物理"
-       （字贴在井壁上，板从井底升上来），但透视对"位置"和"尺寸"的压缩不是一回事：
-       推远 540px 之后四行的 kz 从 1:2:4:8 被压成 1:1.45:1.88:2.21，**行距比字高
-       塌得更快**，量出来行距/字高只有 0.35（终态 1.37），四行在中段糊成一块黑饼
-       —— 出图 ?t=800 一看就看见了，读代码是看不出来的。
-       乘同一个 s 则任何时刻的行距/字高都等于终态，从最小到最大一路都读得清，
-       观感也仍然是"由小变大、由远及近"（整块板从灭点朝我们过来）。
-       s=1 时下面几项全部还原成原值，**终态与入场前逐像素一致**。 */
+    /* 入场先收棱线，字板随后从灭点展开。位置与尺寸共乘 s，保持行距/字高比；s=1 恢复终态。 */
     var pe = clamp((prog - 0.40)/0.60, 0, 1);
     pe = pe*pe*(3 - 2*pe);                     // smoothstep：末段减速才像"落定"
     var s  = P.s0 + (1 - P.s0)*pe;
@@ -1665,9 +1198,7 @@ function wellText(prog){
     var txt = L[j].replace(/^\s+|\s+$/g, "");
     if (!txt) continue;
 
-    /* 先在 100px 下量一遍，再反推"正好凑成 targetW"的字号。
-       宽度必须是**给定**的，不能靠"字号 × 倍率"去逼近 —— 每行的字数不一样
-       （还有带空格的 MY WAY），按字号缩放永远差一截。 */
+    /* 先以 100px 测字宽，再反推匹配 targetW 的字号，兼容各行字数与空格差异。 */
     /* 宽度单独一条序列。字号 kz 仍然是 2^j（它同时管着 cap 和 cy），只有宽度
        不跟它走 —— 见 P.kwq。行数超过序列长度时沿用最后一档，不报错。 */
     /* × s：入场时整块板还小一号（见上面）。cap 也跟着 s 小了，所以
@@ -1680,7 +1211,7 @@ function wellText(prog){
     var fs = 100*targetW/probe;
     ctx.font = "900 " + fs.toFixed(1) + "px " + FONT;
 
-    /* 逐字量宽。要的不是"能不能画"，是每个字的**中心**在哪 —— 一行横过去时
+    /* 逐字量宽。要的不是"能不能画"，是每个字的中心在哪 —— 一行横过去时
        两端离观察者更近，位置和大小都要跟着变（见下面 u）。 */
     for (k=0;k<ch.length;k++){ wd[k] = ctx.measureText(ch[k]).width * P.ew; }
     var sp = fs*P.sp, tw = 0;
@@ -1701,38 +1232,23 @@ function wellText(prog){
     for (k=0;k<ch.length;k++){
       var xc = x + wd[k]/2;
       x += wd[k] + sp;
-      /* u = 这个字在这一行里的横向位置（-1..1）。两端 u² 大 → 更靠近观察者 →
-         kk 更大 → 屏幕上更大、而且**离消失点更远**。后者就是"整行两端往下沉"：
-         原片 1997 的顶弧中间高、两端低约 17% 字高，整体 fillText 是平的，
-         做不出来。用 kk 同时推大小和位置，两项才是一致的。 */
+      /* 横向两端按 u² 增大投影 kk，尺寸和离灭点距离同时增加，形成弧面下沉。 */
       var u  = tw > 0 ? xc/(tw/2) : 0;
       var kk = 1 + P.curl*u*u;
 
-      /* ★ 纵向透视：同一个字的**顶边比底边远**，所以顶边窄、底边宽 —— 一个字
-         本身是个上窄下宽的梯形，不是上下等宽的贴纸。这是"字贴在斜面上"的直接
-         后果：横向尺度 ∝ 离灭点的距离，于是
-             k顶/k底 = (dy − 半高) / (dy + 半高)
-         算出来 1997 顶比底窄 38%、SINCE 窄 33%、CODING 只窄 18% —— 越靠近我们
-         越明显，正是该有的样子。
-
-         canvas 2D 只有仿射变换，画不出梯形，只能把字符切成 NS 条横带、每条按
-         自己的系数画一遍。**clip 的路径存的是设备坐标**，所以 clip 之后再 scale
-         只缩字形、不缩带子 —— 这是这段能成立的全部理由，顺序反了就废。 */
+      /* 字上缘更远，横向缩放比 k顶/k底=(dy−半高)/(dy+半高)。
+             canvas 将字切成横带，各自 clip 后再缩放，保持裁剪带位于设备坐标。 */
       var dRow = cy - VP.y;                    // 这一行（字符中心）离灭点多远
       var half = cap*kk*0.56;                  // 屏幕半高，留 12% 余量给描边
       var kTop = dRow > half ? (dRow - half)/(dRow + half) : 1;
-      /* 条数由**台阶**反推，不由带高定。这条带的横向位置是 xc*kk*kS，相邻带
-         kS 差 (1−kTop)/NS，于是边界处的错位 = (1−kTop)×|离灭点最远的那条边|/NS。
-         让它 ≤ P.step 就解出 NS。用"最远的那条边"（|xc*kk| + 半字宽）而不是
-         字宽本身：位移项和缩放项叠加，外面那条边永远是台阶最大的地方。
-         上限 400 只是防 ?step 被填成 0.01 时炸掉；kTop=1（这一行已经在灭点上）
-         时 NS 落到下限 6 —— 那时确实没有透视可切。 */
+      /* NS 由最远边距与透视比例解出，使相邻带台阶≤P.step。
+             同时计入字心位移与半字宽，条数限制在 6~400。 */
       var maxX = Math.abs(xc*kk) + wd[k]*kk/2;
       var NS   = clamp(Math.ceil((1 - kTop)*maxX/P.step), 6, 400);
       if (NS > geo.nsMax) geo.nsMax = NS;      // 探针：这一行最费的那个字切了几条
 
       ctx.save();
-      /* 原点放在**灭点的水平位置**上，不是字符自己的中心 —— 理由见下面那条
+      /* 原点放在灭点的水平位置上，不是字符自己的中心 —— 理由见下面那条
          translate。纵向那条 curl 修正照旧加在这里（它只跟 kk 有关）。 */
       ctx.translate(VP.x, cy + (cy - VP.y)*(kk - 1));
       ctx.globalAlpha = P.bgop;
@@ -1744,19 +1260,10 @@ function wellText(prog){
         /* 带子之间留 0.75px 重叠，不然相邻两条的边界会露出没画到的发丝缝。 */
         ctx.rect(-1e5, -half + (s/NS)*2*half, 2e5, 2*half/NS + 0.75);
         ctx.clip();
-        /* ★★ 这一条横带的横向位置 = 灭点 + 字的世界横向位置 × **这一带的** k。
-           透视里"远"是两件事一起发生：变小，**并且向灭点收拢**。原来只写了
-           scale(kS,1)，那是围绕**字符自己的中心**缩 —— 字确实变窄了，可位置
-           一动不动，于是四个字在屏幕上仍是四根平行的柱子。
-           少了收拢这一半，整行反而看着**上宽下窄**：`1` 的旗和 `7` 的横杠本来
-           就横伸在顶上，底部往里收的时候它们还杵在外面 —— 正好和"上端在远处"
-           相反。用户看了一眼就报了「上下反了」，根子在这里，不在字形上。
-           ?pull=0 关掉，对照用。 */
+        /* 每带横向位置=灭点+世界横向位置×该带 k，缩小同时向灭点收拢；?pull=0 关闭以作对照。 */
         ctx.translate(xc*kk*(P.pull ? kS : 1), 0);
         ctx.scale(kS, 1);
-        /* 先按两轴各自缩放，**再**斜切。顺序反了的话斜切量会被纵向那个 ky 除
-           一遍，越靠下的行倾斜越看不出来；而原片四行的倾角是一样的（1997 的
-           "1" 实测斜率 0.3，约 17°，和上面几行没差别）。 */
+        /* 先执行两轴缩放，再斜切，保持各行相同倾角。 */
         ctx.scale(P.ew*kk, kk*ky);
         ctx.transform(1, 0, -P.slant, 1, 0, 0);      // 向右倾（原片是斜体）
         if (P.sw > 0){ ctx.lineWidth = fs*P.sw; ctx.strokeText(ch[k], 0, 0); }
@@ -1775,38 +1282,23 @@ function frame(now){
   if (!last) last = now;
   var dt = Math.min(0.05, (now-last)/1000); last = now;
   if (PIN !== null){ demoT = PIN; }
-  /* ★ demoT 是**页面活了多久**，跟 P.auto 无关。auto 管的是"要不要给书一个横向
-     乱飞的初速"，两件事原来混在一个 if 里 —— 于是不加 ?auto=1 直接打开页面，
-     demoT 永远停在 0，入场一帧都不播，只能看见灭点上的一个小不点。
-     ★ 物理**无条件跑**：书从井口掉过来是场景自己的动作，不打开 auto 也该有。
-     定格（PIN）时物理不走 —— 那是预跑那条路干的事（见文件末尾）。 */
+  /* demoT 与物理推进不依赖 P.auto；auto 仅控制额外初速。PIN 定格由预跑分支设置状态。 */
   /* `GATE` 期间钟不走，但 `step()` 照跑 —— 入场还没走完时井里本来就没有纸
      （spawn 那道 `demoT < P.wt` 的闸），所以 step 是空转，无害。 */
   else { if (!GATE) demoT += dt; step(dt); }
-  /* ?hold= 的定格写在**物理之后**（见 freezeHold 那段）。PIN 那条路走不到这里
+  /* ?hold= 的定格写在物理之后（见 freezeHold 那段）。PIN 那条路走不到这里
      —— ?t= 时物理本来就不跑，而定格要的是"纸已经在手上"这个状态。 */
   if (FR) freezeHold();
   /* 入场那两秒走每帧重画的另一条路（见 wellIntro）。过了就回到离屏那张缓存。
-     ★ 别把 demoT 直接当进度用 —— 它跟 wt 是两回事，`wt=0` 时这一步恒不成立。 */
+     别把 demoT 直接当进度用 —— 它跟 wt 是两回事，`wt=0` 时这一步恒不成立。 */
   var intro = (P.wt > 0 && demoT < P.wt);
   if (intro) wellIntro(clamp(demoT/P.wt, 0, 1));
   else backdrop();                        // 只在非入场时贴一次
-  /* ★ 纸分两拨画（2026-10-07 用户要求：「纸被拿起后，图层就在下面那个字之上了，
-     方便阅读」）——
-       ① 井里那些没被碰过的纸还属于**场景**，照旧画在字之前（被字压着）；
-       ② 被手拿起来的那张已经脱离井壁、成了**手上的卡片**，要画在最上面
-          （压在字上），否则纸上的内容被字盖住就没法读了。
-     "被拿起过"判据用 face>0：松手之后它就地晕染，face 仍是 1，正好继续压着字
-     —— 消散的全过程都得看得见。held 那一条是补按下到 face 起身之间的第一帧。
-
-     ★★ ② 现在走的是**另一张 canvas**（#cvup，见 drawUpLayer），不再是主画布。
-     起因是用户同一天的第二条：「出口…图层要在拿起的纸之下」—— `#exit` 是 DOM、
-     纸在 canvas 里，DOM 永远在 canvas 之上，要让纸压住它只能把纸搬到一张
-     **排在 #exit 后面**的 canvas 上。顺带把消散从"涂一层底色红"换成了真擦
-     （见 drawSheet 那段）。 */
+  /* 未拿起的纸画在主 canvas 的字层下方；face>0 或 held 的纸画入 #cvup，
+       层序高于文字和出口，松手后的消散继续保留该层。 */
   var up = [];
   if (P.paper){
-    /* 井里那拨彼此**不重叠**（每张占自己的角度扇区），所以不用排序，
+    /* 井里那拨彼此不重叠（每张占自己的角度扇区），所以不用排序，
        也没有画家算法的顺序问题 —— 这正是"好做"省下来的那部分。 */
     for (var j=0;j<sheets.length;j++){
       if (sheets[j].face > 0 || sheets[j].held) up.push(sheets[j]);
@@ -1824,19 +1316,12 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
-/* 拿起的纸画进 #cvup（排在 #exit 之后的那张 canvas）。
-   ★ 每帧必须先清：主画布每帧都被 backdrop() 整个盖一遍，不留上一帧的东西；
-     这张层没有那样的底，不清的话纸会在上面**拖出一道轨迹**（一帧一张，越叠越多）。
-   ★ 清空用设备像素 + 单位变换：setTransform(DPR…) 之后 clearRect(0,0,W,H)
-     也对（W/H 乘 DPR 正好铺满），但那样依赖"W/H 和画布属性尺寸是同一个式子算的"
-     这条约定；直接清设备像素不依赖任何东西。 */
+/* #cvup 每帧以单位变换清空设备像素尺寸，避免拖动留下上一帧轨迹。 */
 function drawUpLayer(up){
   ctxup.setTransform(1, 0, 0, 1, 0, 0);
   ctxup.clearRect(0, 0, cvup.width, cvup.height);
   if (!up.length) return;
-  /* 跟 layer() 同一套手法：临时把全局 ctx 指过去，drawSheet / poly 都照着它写。
-     finally 是必需的 —— 漏还原的话剩下的 hud() 和下一帧会全画进这张纸层，
-     而屏幕上只剩"主画布停在最后一帧"，不报任何错。 */
+  /* 绘制上层纸时临时切换 ctx，finally 恢复，避免后续 HUD/主帧画错层。 */
   var outer = ctx;
   try {
     ctx = ctxup;
@@ -1862,7 +1347,7 @@ function hud(){
           + (cards[0] ? cards[0].t.toFixed(0) : "-") + "px"
           + "   封面 " + (P.book|0) + " = " + BOOKS[P.book|0] + "（B 键换）\n"))
     /* 画布尺寸和 DPR 打出来：绘制坐标系少乘一次 DPR 时，画面只剩左上角一块，
-       而 HUD 里这两个数**看起来都是对的** —— 有这行才分得清是尺子错了还是画错了。 */
+       而 HUD 里这两个数看起来都是对的 —— 有这行才分得清是尺子错了还是画错了。 */
     + "画布 " + W + "×" + H + " css · DPR " + DPR + " → " + cv.width + "×" + cv.height + " 设备"
     + "   纸层 " + cvup.width + "×" + cvup.height + "（拿起的纸走这张）\n"
     + "井 灭点 " + (P.vpw*100).toFixed(0) + "%W / " + (P.vph*100).toFixed(0) + "%H"
@@ -1898,22 +1383,14 @@ function hit(px, py){
   return best;
 }
 cv.addEventListener("pointerdown", function(e){
-  /* ★ 包一层 try：CDP 合成的指针事件（探针脚本派发的）pointerId 不是活的，
-     setPointerCapture 会抛 NotFoundError，一抛后面整段拾取就都不执行了 ——
-     症状是"探针里点不动、真人点得动"，很难查。真人点的时候照常生效。 */
+  /* 捕获指针失败不阻断拾取；CDP 合成事件的非活动 pointerId 可抛 NotFoundError。 */
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
   pointer.x = e.clientX; pointer.y = e.clientY;
-  /* 纸那一套（P.paper=1）：抓到就**冻住生长**、浮到屏幕前转正、跟着手走（见
-     stepHold），松手晕染掉。书那一套在下面 —— 两套共用这一个 pointer 对象，
-     各记各的"手上是谁"。 */
+  /* 纸模式拾取后冻结生长、转正并跟手，松手消散；书模式共用 pointer 状态。 */
   if (P.paper){
     var sh = hitSheet(e.clientX, e.clientY);
     if (sh){
-      /* 转正的起点：纸心此刻的屏幕位置 + 此刻的尺寸，都**在按下这一刻定下来**。
-         尺寸必须冻结 —— 不然转正途中纸会被 r0/r1 牵着走（kill 之外的东西还可能
-         动，而且释放后的漂移不是这里要的）。
-         fw 是"等效屏幕宽度"：按中段半径把那段弧长算成直线，跟 sheetQuad 里的
-         half 同一套算法；fh 直接是 r1-r0。 */
+      /* 按下时冻结纸心和 fw/fh，避免转正途中尺寸继续漂移；fw 取中段等效弧宽，fh=r1−r0。 */
       var g0 = sheetGeom(sh), N2 = Math.max(6, P.rays)|0,
           span0 = clamp(P.pSpan|0, 1, N2-1);
       var rmid0 = Math.max((g0[0]+g0[1])/2, 1);
@@ -1922,7 +1399,7 @@ cv.addEventListener("pointerdown", function(e){
       sh.fx = VP.x + Math.cos(sh.th)*rmid0;
       sh.fy = VP.y + Math.sin(sh.th)*rmid0;
       sh.held = true;
-      /* 锚 = 指针相对纸心的偏移。之后全按**这个偏移**走，所以手往哪儿甩纸都不跳
+      /* 锚 = 指针相对纸心的偏移。之后全按这个偏移走，所以手往哪儿甩纸都不跳
          —— 跳是"按下瞬间纸瞬移到指针底下"那个老毛病。 */
       sh.hold = { ox: e.clientX - sh.fx, oy: e.clientY - sh.fy };
       pointer.sheet = sh;
@@ -1941,10 +1418,7 @@ function release(){
     var sh = pointer.sheet;
     sh.held = false;
     sh.puff = 0;
-    /* ★ 松手**立刻开始消散**，不是继续往外飘。原片那句字幕的顺序就是
-       「这个图片在松开鼠标之后会有一个影像消失的效果」—— 松手 → 消失。
-       手把纸拉过来、松手，它就没了；这是"拉扯过来"这个动作的收尾。
-       消散期间生长冻住（stepSheet 里 continue），所以它是**在原地**烂掉的。 */
+    /* 松手立即开始消散，不再向外漂移；纸与内容共同擦除。 */
     sh.dying = 0.001;
     pointer.sheet = null;
     cv.classList.remove("drag");
@@ -1953,7 +1427,7 @@ function release(){
   var c = pointer.card;
   if (c){
     c.held = false;
-    c.vx *= 1.35; c.vy *= 1.35;          // 甩出去要**比跟手速度再快一点**，不然手感发闷
+    c.vx *= 1.35; c.vy *= 1.35;          // 甩出去要比跟手速度再快一点，不然手感发闷
     c.wz = clamp(c.vx*0.0016, -3.2, 3.2);
     c.wy = clamp(c.vx*0.0011, -2.4, 2.4);
     c.wx = clamp(-c.vy*0.0013, -2.4, 2.4);
@@ -1966,20 +1440,17 @@ addEventListener("pointercancel", release);
 /* R 键重播入场。入场只有 2.2 秒，看一眼就过去了，不重播没法反复看节奏 ——
    刷新页面也行，但那会把卡片的摆位一起重置掉。 */
 addEventListener("keydown", function(e){
-  /* R = 完整重播：时钟归零之外还要把井**清空**，否则重播时上一轮的书还在飞，
-     跟字一起从灭点往外长，看到的是两遍叠在一起。 */
+  /* R 重播同时归零时钟和清空已有书，避免新旧入场叠加。 */
   if (e.key === "r" || e.key === "R"){
     demoT = 0; cards.length = 0; spawnQueue = 0;
     sheets.length = 0; sheetQ = 0;          // 两套都清，省得切 ?paper= 时串台
   }
-  /* B 键换封面版式。三版只能**在井里飞着**的时候挑：定格图里书是钉住不动的，
-     真实场景里它一直在转、大小不停变、还跟字叠在一起 —— 两个地方看到的不是
-     同一件事（这项目已经栽过一次：判"贴不贴边"用缩略图会读反）。 */
+  /* B 切换封面版式，需在飞行中检查旋转、尺寸与文字的叠加效果。 */
   else if (e.key === "b" || e.key === "B") P.book = ((P.book|0) + 1) % 3;
 });
 
 /* 演示花活：?auto=1 隔一会儿给某本书一个横向初速，让它飞得乱一点。
-   书的"出场"和物理**不归它管**（见 frame 里那一段）—— 它只是个搅局的。 */
+   书的"出场"和物理不归它管（见 frame 里那一段）—— 它只是个搅局的。 */
 if (P.auto){
   var seq = 0;
   setInterval(function(){
@@ -1999,24 +1470,15 @@ if (P.auto){
 resize();
 T0 = performance.now();
 for (var i0=0;i0<P.n;i0++) spawn();
-/* ?t= 定格：把物理**按固定步长从 t=0 跑到该时刻**，而不是"跑一会儿再截图"——
-   后者每次出图都不一样，做不了 A/B，也复现不了。种子固定，所以这条路上
-   同一个 t 永远得到同一帧。 */
+/* ?t= 使用固定步长预跑物理至目标时间，结合固定种子保证截图可复现。 */
 if (PIN !== null){
-  /* ★ **必须一起推进 demoT**，否则量到的不是同一件事：书什么时候从井口出来是
-     demoT 的函数（见 spawn 开头那道闸），预跑只走 step() 的话 demoT 恒为 0，
-     每一本书都被闸挡掉，?t=3000 拍出来是口空井 —— 而且不报任何错。 */
+  /* 预跑同时推进 demoT 与 step()，使出生时刻与正常播放一致。 */
   for (var acc=0; acc<PIN; acc+=1/60){ demoT = acc; step(1/60); }
   demoT = PIN;
 }
 requestAnimationFrame(frame);
 
-/* ── 出口：点它回小镇 ──────────────────────────────────────────────
-   `well-exit` / `well-hello` 是给父页（`town.html`）的暗号。**跨文档只能这么
-   说话** —— 读不到对方的变量，也读不到对方的 DOM。
-   ⚠ 这一页**单独打开**时 `parent === window`，消息会发给自己。加守卫，
-     否则点「出口」会往自己耳朵里喊一声（无害但是脏）。
-   ⚠ 那一头**不能拿 `e.origin` 当门**：file:// 丢过去的 origin 是不透明的。 */
+/* 通过 well-hello/well-exit 与父页通信，parent===window 时不发送；file:// 不依赖 origin。 */
 function wellSay(what){
   if (window.parent && window.parent !== window)
     window.parent.postMessage({ what: what }, "*");
@@ -2026,32 +1488,19 @@ exitEl.addEventListener("keydown", function(e){
   if (e.key === "Enter" || e.key === " "){ e.preventDefault(); wellSay("well-exit"); }
 });
 
-/* 父页叫我们起钟（它那边叫 `wellGo()`，在幕开始往下让的那一刻发）。
-   这一页**自己不带闸时收到也无害** —— `GATE` 本来就是 false，赋值等于没做。
-   ★ 和 `well-exit` 一样**不能拿 `e.origin` 当门**：file:// 下它是空的/不透明的。
-   ★ 单向：这边只收不答。`well-hello` 是加载时报到用的，跟这条无关。 */
+/* well-go 解闸并重置帧起点，避免把等待时间累计为首帧大 dt。 */
 window.addEventListener("message", function(e){
   var d = e.data;
   if (d && typeof d === "object" && d.what === "well-go") GATE = false;
 });
 
-/* 报到。父页拿它当**跨文档的硬判据** —— iframe 的盒子有尺寸时里面完全可能
-   是一片空白（在 `display:none` 下建好的那种 0×0 的井就是这样），
-   所以"盒子有尺寸"证明不了什么，只有这条消息能。
-   双 rAF 是为了等第一帧真的画完再报。 */
+/* well-hello 在初始化完成后报到；定格也发送，不依赖 frame() 启动。 */
 requestAnimationFrame(function(){ requestAnimationFrame(function(){
   wellSay("well-hello");
 }); });
 
-/* 探针。`dx`/`dy` 是字心离消失点多远 —— **必须恒为 0**（它是判"钉没钉在井口"
-   的唯一硬判据，肉眼看两张图差几个像素是看不出来的）。
-   `fontLoaded` 只证明**字体文件加载了**，不证明「出口」两个字在子集里 ——
-   缺字形这件事 `document.fonts.check` 查不出来（它报 True），
-   硬判据只有 canvas 逐像素比。子集有没有漂，看 `pix-subset.py` 打印的"新增/移除"。 */
-/* ⚠ 名字里必须带 `Probe`：页面自己**早就有一个** `window.__well`（`:1194` 那个
-   几何数组，`:1252` 往里 push）。挂同名会把它整个覆盖掉，而它只写不读 ——
-   所以覆盖之后**没有任何症状**，`errs` 是空的、`well-hello` 照发，
-   只有探针取值时才炸出一个 `KeyError`。抢注别人的名字是这次真踩到的。 */
+/* dx/dy 验证出口中心对齐 VP；fontLoaded 仅表示文件加载，字形覆盖需像素对照。 */
+/* 探针使用 Probe 后缀，避免覆盖已有 window.__well 几何数组。 */
 window.__wellProbe = {
   state: function(){
     var r = exitEl.getBoundingClientRect();
@@ -2066,20 +1515,14 @@ window.__wellProbe = {
   say: wellSay
 };
 
-/* 纸上那段字的探针。名字里带 Probe —— 理由同上：`window.__paper` 这种短名字
-   谁都可能先用掉（这一页自己就有一个 __well 的先例）。
-   ★ 出图时图里只有"一块字"，看不出**抽到的是第几段、排了几行、纸该多大、
-     此刻长到多大** —— 而"尺寸有没有跟段落适配"这个结论全在这四个数上。
-     所以这四个数必须能读出来，不能靠看图猜。 */
+/* 纸文本探针使用 Probe 后缀，输出段号、行数、目标尺寸和当前尺寸。 */
 window.__paperProbe = {
   list: function(){
     var out = [];
     for (var i=0;i<sheets.length;i++){
       var s = sheets[i];
       if (!s.pick) continue;
-      /* ★ sx/sy 是**字**被拉伸的倍数（drawPaperText 里那两个 scale），
-         终态该是 1.00 / 1.00。它们不等于 1 就是字被扯变形了 ——
-         而"看着扁"这件事在图上只有 40% 以上才读得出来，量出来才有话说。 */
+      /* sx/sy 为正文缩放，终态应为 1/1；目标尺寸由当前段落排版反推。 */
       var Q1 = sheetQuad(s);
       out.push({ seg:s.segN, src:s.pick[0], chars:s.pick[1].length,
                  lines:s.lay.lines.length,
@@ -2109,9 +1552,7 @@ window.__paperProbe = {
     }
     return out;
   },
-  /* 把 37 段**全部**排一遍。"尺寸适配"这件事图上一次只能看一段，
-     而"有没有哪一段被缩到看不清 / 撑到出屏"是个**分布**问题 ——
-     只能在数据上看。返回每一段的字/行数/纸尺寸/最终字号。 */
+  /* 批量返回 37 段的字数、行数、纸尺寸和最终字号，检查适配分布。 */
   layoutAll: function(){
     var out = [], fsmin = 1e9, wmax = 0, hmax = 0, bad = [];
     for (var i=0;i<PS.length;i++){
@@ -2119,10 +1560,7 @@ window.__paperProbe = {
       out.push({ seg:i+1, chars:PS[i][1].length, lines:L.lines.length,
                  w:Math.round(L.w), h:Math.round(L.h), fs:+L.fs.toFixed(1) });
       fsmin = Math.min(fsmin, L.fs); wmax = Math.max(wmax, L.w); hmax = Math.max(hmax, L.h);
-      /* 断行有没有**从词中间劈开**：上一行以 ASCII 结尾、下一行以 ASCII 开头
-         就是劈了（"…她有100" / "0种…"）。★ 这一条必须由机器查：它不报错、
-         排版看着完全正常，只有**盯着那一行读**才看得出来 —— 出图撞见的那次
-         就是这么发现的，而且是翻到第 14 行才看见的。 */
+      /* ASCII 词不应跨行拆开，检查相邻行末尾/开头的字符类型以定位断词。 */
       for (var k=0;k+1<L.lines.length;k++){
         var a = L.lines[k], b = L.lines[k+1];
         if (a && b && WORDRE.test(a.charAt(a.length-1)) && WORDRE.test(b.charAt(0)))
@@ -2132,34 +1570,24 @@ window.__paperProbe = {
     return { rows: out, fsMin:+fsmin.toFixed(1), wMax:Math.round(wmax),
              hMax:Math.round(hmax), W:W, H:H, broken:bad };
   },
-  /* 池子本身要在**页面里**核一遍：build-doc.py 报的是它写进文件的内容，
-     页面读的是数组 —— 两者之间还隔着一次文件写入（路径写错过一次，
-     正是"写了一个、没写另一个"）。 */
+  /* 探针读取页面实际段落数组，核对生成数据是否写入了正确文件。 */
   pool: function(){
     var L = PS.map(function(p){ return p[1].length; }).sort(function(a,b){ return a-b; });
     return { n:PS.length, min:L[0], p50:L[L.length>>1], max:L[L.length-1],
              srcs:PS.map(function(p){ return p[0]; })
                     .filter(function(v,i,a){ return a.indexOf(v)===i; }).length };
   },
-  /* 洗牌袋：**只看不动** —— 这一轮接下来会发哪些段、还剩几个。
-     ★ 这条判据的用途是"跨加载"的：它要回答的问题（"每次进井顺序一样吗"）
-       在任何**单次**采样里都看不出来 —— 一次运行内的顺序永远是"看着挺随机"。
-       所以判法只能是连开几次、比 `next` 的头一位。
-     `bagLeft` 数到 0 就是下一张会触发重洗。 */
+  /* 洗牌袋探针只读 next/bagLeft；跨加载比较首段，验证默认顺序变化。 */
   bag: function(n){
     n = clamp(n|0 || 5, 1, PS.length);
     var out = [];
     for (var k=0;k<n && bagIx+k < bag.length;k++) out.push(bag[bagIx+k] + 1);
     return { seed: bagSeed, left: bag.length - bagIx, next: out,
-             last: bagLast + 1 };      // last 是**刚发出去**的那段（还没发过 = 0）
+             last: bagLast + 1 };      // last 是刚发出去的那段（还没发过 = 0）
   }
 };
 
-/* HUD 默认不显示，`?probe` 才开 —— 理由见 CSS 那条 ★。
-   ★ **探针不受影响**：`display:none` 的元素 `textContent` 照常读得到。
-     `_logs/_wellgate.py` / `_wellintro.py` 读的入场百分比、抽到第几段、`errs`
-     全是 textContent。出图想在图里带读数，探针里临时 `style.display="block"`
-     一下即可（和"临时藏掉幕"是同一招的反面）。 */
+/* HUD 默认隐藏，?probe 显示；隐藏时仍可读取 textContent。 */
 document.getElementById("hud").style.display = Q.has("probe") ? "block" : "none";
 </script>
 </body>

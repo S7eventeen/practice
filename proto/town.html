@@ -7,8 +7,7 @@
 <style>
   html,body{margin:0;height:100%;background:#10161F;overflow:hidden;
             font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif}
-  /* 舞台：所有坐标都在这个坐标系里。几何不从视口读，从 ?w=/?h= 读——
-     无头 Edge 启动时视口是 746×483，不这样的话探针量到的和截到的对不上。 */
+  /* 舞台几何优先使用 ?w=/?h= 指定尺寸，使无头截图与测量使用同一坐标系。 */
   #stage{position:absolute;left:0;top:0;transform-origin:0 0}
   svg{display:block}
   #snow{position:absolute;left:0;top:0;pointer-events:none}
@@ -16,8 +15,7 @@
   .b .body{transition:transform .22s cubic-bezier(.23,1,.32,1)}
   .b:hover .body{transform:translateY(-3px)}
   .b .sign{opacity:0;transition:opacity .18s ease-out}
-  /* 用 .hov 而不是 :hover —— 合成的 pointerenter 不会让 :hover 生效，
-     于是这条状态在无头截图里永远看不到，等于没法验。走 class 两条路合一。 */
+  /* 悬停统一使用 .hov，让真实指针与合成 pointerenter 共享样式。 */
   .b.hov .sign,.b.on .sign{opacity:1}
   .win{transition:fill .30s ease-out}
   #storyToast{position:fixed;left:50%;bottom:46px;z-index:25;transform:translate(-50%,12px);opacity:0;pointer-events:none;
@@ -28,15 +26,11 @@
   #hud{position:fixed;left:10px;bottom:10px;color:#8FA3B8;font:12px ui-monospace,Consolas,monospace;
        background:#0B1017cc;padding:6px 9px;border-radius:6px;white-space:pre;pointer-events:none;display:none}
 
-/* 聊天面板：从右边拉出来的抽屉，不做满屏（满屏是"换了一页"，留 16px 边距才是
-   "镇子边上多了个人"）。"让位"是两件事一起发生 —— 面板进来、镇子同时左移，共用
-   同一条缓动和时长，不同步就是两个独立事件在打架。形态取 Game Boy 那种壳子，
-   明度和真机相反。投影整条删掉：天空已经压暗，留着是黑压黑。 */
+/* 聊天抽屉保留 16px 边距；进场与镇子让位使用相同的时长和缓动。 */
   #chat{
     --p-bg:#2A1704; --p-bg2:#3E2408; --p-mid:#8A5A18; --p-dk:#FFD089;
     position:fixed; top:16px; right:16px; bottom:16px; width:376px; z-index:20;
-    /* border-box：4px 边框向内吃，面板总宽仍是 376px。下面 `#wshift` 的
-       -214px 是按"面板左缘 1048"量的，这样才能不跟着改。 */
+    /* border-box 将 4px 边框计入总宽 376px；镇子位移按此宽度计算。 */
     box-sizing:border-box;
     display:flex; flex-direction:column; overflow:hidden;
     background:var(--p-bg); border:4px solid var(--p-dk); border-radius:0;
@@ -46,10 +40,7 @@
     transition:transform .42s cubic-bezier(.22,.9,.3,1);
   }
   body.chat-open #chat{ transform:translateX(0) }
-/* 镇子左移。移的是镇子那一层（`#wshift`），不是 `#stage` —— `#stage` 里除了镇子
-   还有一个铺满全屏的天空 rect，推它等于把天空一起推走，右边就露出 214px 的 body
-   底色。面板盖住大半，只在上下沿和右侧那 16px 缝里露出来，肉眼扫过去像"没问题"。
-   SVG 坐标一个都不用动：`P()` 算完的坐标进 DOM 就定了，CSS transform 在那之后。 */
+/* 只平移 #wshift，保留 #stage 内的全屏天空。CSS 平移叠加在 P() 的投影之后。 */
   #wshift{ transition:transform .42s cubic-bezier(.22,.9,.3,1) }
 /* 214px：1440 宽下镇子的右缘在 x≈1206，面板左缘在 1048，不移就压着书店那栋。
    留 56px 空隙。 */
@@ -57,16 +48,13 @@
 
   .c-top{ display:flex; align-items:center; gap:11px; padding:10px 11px;
           background:var(--p-bg2); border-bottom:4px solid var(--p-dk); flex:none }
-  /* 头像不是图片，是当场把镇上那只狗画一遍再裁到头（dogHead()）—— 方角化
-     之后它自动跟着变，不会多出一个要同步的 png。 */
+  /* dogHead() 复用镇上狗的几何生成头像。 */
   .c-av{ width:36px; height:36px; flex:none; overflow:hidden;
          background:var(--p-bg2); border:2px solid var(--p-dk); border-radius:0 }
   .c-av svg{ display:block; width:100%; height:100% }
   .c-who{ display:flex; flex-direction:column; line-height:1.25; min-width:0 }
   .c-who b{ letter-spacing:.02em }
-  /* 边框留透明的：它是占位的，管住 28×28 的点击区，不画出来。
-     （预览里那个 × 就是没有框的，别给它加 —— 加了这行就变成"框住的按钮"，
-     和顶栏右侧该有的样子不符。） */
+  /* 透明边框保留 28×28 点击区，不显示按钮外框。 */
   .c-x{ margin-left:auto; width:28px; height:28px; flex:none; cursor:pointer;
         background:transparent; border:2px solid transparent; border-radius:0;
         color:var(--p-mid); line-height:1; padding:0 }
@@ -79,18 +67,12 @@
   .c-bub{ max-width:250px; padding:9px 12px;
           background:var(--p-bg2); border:3px solid var(--p-mid); border-radius:0;
           line-height:1.8; word-break:break-word; white-space:pre-wrap }
-  /* 原来气泡左上一角咬掉一口、指向头像 —— 方角机器没有圆角，那一口自然取消。 */
-  /* 自己说的那句：换个方向排、不带头像（微信那条规矩 —— 对面才带头像）。
-     底色取四值里中间那档 `--p-mid`：比狗的 `--p-bg2` 亮一档就够分清，
-     不必到 `--p-dk` 那个最亮档 —— 每条自己的话都变亮块，会把狗的话压掉。 */
+  /* 本人消息右排且不带头像，使用 --p-mid 区分狗的消息。 */
   .c-row.me{ flex-direction:row-reverse }
   .c-row.me .c-bub{ background:var(--p-mid); border-color:var(--p-dk) }
 
-/* 「狗在想」那三个点：先冒『…』再说话。画成方块而不是 Zpix 的 `…` —— `…` 是
-   整体字形闪不出"依次"，而 3×3 方块本来就是点。方块高度要让气泡总高和一行文字的
-   气泡一模一样，否则换成真话那一刻气泡变高、底下整列对话往下跳，而那一跳正好在
-   "狗开口"这个时刻上。基础 opacity:.22 是必须的：动画还没开始时后两个点会全亮，
-   看着像"先亮三点再开始闪"。 */
+/* 思考状态用三个 3×3 方块依次闪烁；初始 opacity:.22，避免动画开始前全亮。
+   高度与单行文字气泡一致，切换文字时保持布局稳定。 */
   .c-dot{ display:inline-block; width:3px; height:3px; margin:0 2px;
           background:var(--p-dk); vertical-align:middle; opacity:.22;
           animation:cDot 1.05s ease-in-out infinite }
@@ -98,47 +80,33 @@
   .c-dot:nth-child(3){ animation-delay:.32s }
   @keyframes cDot{ 0%,80%,100%{opacity:.22} 40%{opacity:1} }
 
-  /* 选项区 = 微信的输入框位置。分隔线要真的分开"对话"和"能说的话"。 */
+  /* 选项区与消息区用分隔线分开。 */
   .c-opts{ flex:none; border-top:4px solid var(--p-dk); background:var(--p-bg);
            padding:9px; display:flex; flex-direction:column; gap:6px }
   .c-opt{ text-align:left; cursor:pointer; padding:9px 11px; border-radius:0;
           background:transparent; border:3px solid var(--p-mid); color:var(--p-dk);
-          /* 别写 `font:14px/1.45 inherit` —— `font` 简写的 family 位置不收 `inherit`，
-             整条声明会被丢掉（只丢自己，所以症状是"字号悄悄没生效"，不报错）。
-             button 的 font-family 本来就不继承，得单独补一条。 */
+          /* button 单独继承 font-family；font 简写不支持将 inherit 用作其中的字体族。 */
           line-height:1.5; font-family:inherit;
           transition:border-color .16s, color .16s, background .16s }
-/* 划过时整块反白（底换最亮那档、字换最暗那档）。"整块亮起"这条是从上一版继承的、
-   跟配色无关：只染字那版得盯着那行字才看得见，整块亮起在余光里就扫得到。
-   上一版 hover 是深蓝底 + 淡青字（取自 hero 页 PALS[1]），那是全镇唯一的冷色、
-   配深蓝玻璃面板正合适 —— 现在是反白的暖色。这条跟着形态走，面板已经不在了。 */
+/* 悬停时整块反白，底色和文字分别使用配色的最亮、最暗档。 */
   .c-opt:hover{ background:var(--p-dk); color:var(--p-bg); border-color:var(--p-dk) }
 
-/* 窄屏：面板从底部升起来，镇子上移让位（左右方向不用让）。原来的 -16vh 不够：
-   390x844 下镇子 bbox 是 y∈[214,453]、面板顶在 308，压掉 145px。现在是算的 ——
-   面板 `62vh` + `bottom:10px` 留给镇子 `38vh-10px`（844 下 309px），镇子高 239px，
-   居中需要 301px ≈ 36vh。改面板高度或 bottom，这个数要跟着改。 */
+/* 窄屏面板占 62vh，镇子上移 36vh 让位。修改面板高度或 bottom 时需重算位移。 */
   @media (max-width:760px){
     #chat{ top:auto; left:10px; right:10px; bottom:10px; width:auto; height:62vh }
     body.chat-open #wshift{ transform:translateX(0) translateY(-36vh) }
   }
 
-/* 公告板：点镇上那栋「公告板」弹的东西。和 #chat 是反的 —— 那个是深棕底 + 亮金字
-   （屏幕里的聊天窗），这个是木色底 + 深字（钉在镇上的木头牌子）。两个都是浮层，
-   同时开会互相压，所以 openNotice 和 openChat 各自开的时候顺手关掉对方。
-   牌面是三层的"一块板"（横向木纹 / 竖向板缝 / 上亮下暗），顺序不能反 —— CSS 的
-   background 先写的在上面。字色取深棕，镇上那支描边色是配冷色天空的。 */
+/* 公告板使用木色底、深棕字，与聊天面板区分。
+   openNotice / openChat 互斥打开，避免浮层重叠。CSS background 先写的层在上方。 */
   #notice{
     position:fixed; inset:0; z-index:30; display:none; place-items:center;
     background:rgba(6,8,14,.55); padding:20px; box-sizing:border-box;
-    /* 24px 是这一棵树的字号基数（`.n-title`、`.n-list li` 再各自显式写一次）。
-       取 24 而不是 12：告示牌上的字是"给站在牌子前的人看的"，要比聊天窗大一档。 */
+    /* 公告板以 24px 为字号基数，标题和列表项各自显式声明。 */
     font-size:24px;
   }
   #notice.on{ display:grid }
-  /* 牌子从上面掉下来一点点。这条是功能性那一半：位移说明"这块牌子是从
-     哪来的"（点击的音效替身），不是装饰。.26s 是还能看出方向的最短时长 ——
-     再短就成了硬切。 */
+  /* 牌面以 .26s 短距离下移表示展开。 */
   @keyframes nDrop{ from{opacity:0; transform:translateY(-14px)} to{opacity:1; transform:none} }
   #notice.on #noticeBoard{ animation:nDrop .26s cubic-bezier(.22,.9,.3,1) }
   @media (prefers-reduced-motion:reduce){ #notice.on #noticeBoard{ animation:none } }
@@ -147,22 +115,14 @@
     position:relative; width:min(620px, 100%); max-height:100%;
     border:5px solid #8A5A32; box-sizing:border-box;
     padding:20px 26px 24px;
-    /* 硬投影（不带模糊半径）—— 和镇上别的方块同一个语言。
-       第一层 `0 0 0 2px` 是木框外面压的一圈暗线，把牌子从遮罩里"切"出来。 */
+    /* 硬投影延续方块风格，首层 2px 暗线分隔木框与遮罩。 */
     box-shadow:0 0 0 2px #6B4522, 0 10px 0 rgba(6,8,14,.45);
-    /* 两层叠出"木头"：① 细横纹（6px 一道的 1px 木理）② 自上而下压深。
-原来还有第三层 —— 108px 一道的竖板缝。去掉了：它 2px 宽、.28 浓度，
-       比横纹重五倍多，又正好从「公告板」到第 6 条那一串字中间穿过去，读起来像
-       一根分隔线而不像木纹。木板确实该是竖缝，但这块牌子正面是要写字的，
-       纹路得退到字后面去。 */
+    /* 木纹由细横纹和纵向明暗渐变叠成；不加竖板缝，以免干扰正文。 */
     background:
       repeating-linear-gradient(180deg, rgba(94,55,22,.055) 0 1px, transparent 1px 6px),
       linear-gradient(180deg, #E6BB85 0%, #D8A468 46%, #C8924F 100%);
   }
-  /* 四角钉。方点不是圆点 —— 全镇没有一处圆角，钉子圆了就成了唯一的例外。
-`:nth-child(1..4)` 数的是 `#noticeBoard` 的子元素，所以那 4 个 <i> 必须
-     排在最前面（HTML 里就是这么放的）：往它们前面插任何元素都会让钉子错位，
-     而错位是静默的（钉子只是跑到别处去了）。 */
+  /* 四个方形钉子必须位于 #noticeBoard 的前四个子节点，位置由 :nth-child 决定。 */
   .n-nail{ position:absolute; width:8px; height:8px; background:#5A3616;
            box-shadow:inset 1px 1px 0 #7A5028 }
   .n-nail:nth-child(1){ left:9px;  top:9px }
@@ -172,13 +132,9 @@
 
   .n-top{ display:flex; align-items:center; padding-bottom:12px;
           border-bottom:3px solid rgba(94,55,22,.42) }
-  /* letter-spacing 拉开来才有"牌子上的字"那个气口。24px 是 12 的整数倍，
-     Zpix 的点阵才不会被插值糊掉（见下面像素字那段）。 */
+  /* 24px 为 Zpix 12px 点阵的整数倍，避免插值模糊。 */
   .n-title{ font-size:24px; color:#6B3F16; letter-spacing:.26em }
-  /* 关闭键的框留透明的（和 `.c-x` 同一条规矩）：它管住 28×28 的点击区，
-     不画出来。
-用的是 `×`（U+00D7）——不是 `✕`(U+2715)：后者不在 Zpix 子集里，
-     会静默回退成平滑字体（这一条在像素字那段注释里写过一次）。 */
+  /* 关闭键保留 28×28 透明点击区；使用子集已有的 ×（U+00D7）。 */
   .n-x{ margin-left:auto; width:28px; height:28px; flex:none; cursor:pointer;
         background:transparent; border:2px solid transparent; padding:0;
         color:#8A5A32; line-height:1 }
@@ -186,10 +142,7 @@
 
   .n-list{ list-style:none; margin:16px 0 0; padding:0; counter-reset:n;
            display:flex; flex-direction:column; gap:10px }
-/* 正文 24px（12 的整数倍）、行高 1.75 → 42px 整。编号交给 CSS counter，不写进
-   HTML：原文自带 `1.`～`6.`，手写进 <li> 里的话，将来在中间插一条就得把后面全部
-   重排一遍。编号和正文分成两列（flex + 定宽 ::before），是因为点阵字里「10.」
-   比「1.」宽一格 —— 不定宽的话，第 10 条起整列正文会右移 12px。 */
+/* 正文 24px、行高 42px；CSS counter 自动编号，定宽 ::before 保持多位编号后的正文对齐。 */
   .n-list li{ counter-increment:n; display:flex; gap:10px;
               font-size:24px; line-height:1.75; color:#2C1B0B }
   .n-list li::before{ content:counter(n) "."; flex:none; width:1.5em; color:#7A4A1E }
@@ -205,26 +158,20 @@
    字形覆盖）；改了文案要重跑 `pix-subset.py --page proto/town.html`。 */
   @font-face{font-family:'Zpix';font-style:normal;font-weight:400;font-display:block;
              src:url(data:font/woff2;base64,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) format('woff2')}
-/* 这两条必须拆开写。`#chat` 那棵树全是 12px、告示牌那棵是 24px，而 `#notice *` 的
-   特异性 (1,0,0) 高过 `.n-list li` 的 (0,1,1) —— 把 `font-size:12px` 留在合并后的
-   规则里，它会静默压掉告示牌的 24px、只压字号不压字体，症状是"像素字在，但小了一号"。
-   （"12 的整数倍"这条两边都成立，只是倍数不同：1× 和 2×，2× 下每个点正好 2×2。） */
+/* 字体族可以共享，字号需分开：#chat 用 12px，公告板用 24px。
+   #notice * 的特异性高于 .n-list li，合并字号规则会覆盖列表字号。 */
   #chat,#chat *,#notice,#notice *{ font-family:'Zpix',ui-monospace,'Cascadia Mono','Consolas',monospace;
                  font-weight:400 }
   #chat,#chat *{ font-size:12px }
 
-/* 转场：黑幕 + 井。点书店 → 幕从上面落下来盖住小镇 → 再点 → 幕继续下沉露出井；
-   出口在井里，回来时幕从下面升上来扫一趟。进是 -100% → 0 → +100%，出是反的，
-   中途那一下同时露出两边，读起来才是"穿过一块幕"。幕是两块：`#veil` 负责盖、
-   `#sceneWrap` 负责装，z 序 面板 20 < 井 30 < 幕 40。缓动和 `#chat` 同一族。 */
+/* 转场向下进入、向上退出；#veil 负责遮罩，#sceneWrap 容纳场景。
+   层序为聊天面板 20、场景 30、幕 40。 */
   #sceneWrap{position:fixed;left:0;top:0;width:100%;height:100%;
              z-index:30;display:none;background:#10161F}
   #sceneWrap.on{display:block}
   #sceneWrap iframe{display:block;width:100%;height:100%;border:0}
-/* 暗房那间不是 iframe，是同文档的一张 canvas —— 它和 `#scene` 是兄弟，由 `#sceneWrap`
-   的 `data-k` 决定显示哪个。不像井 / 开发室那样挂 iframe 是因为这页要能当一个文件
-   发出去，照片外链出去就哑了（井和开发室单发时是空的，那是已知的差额）。
-   `touch-action:none` 必需，不然触屏上拖动会被当成滚动手势抢走。 */
+/* 暗房使用同文档 canvas，照片内联以支持单文件分享。
+   #sceneWrap[data-k] 在 canvas 与 iframe 间切换；touch-action:none 保留触屏拖动。 */
   #sceneWrap canvas{display:none;width:100%;height:100%;touch-action:none;cursor:grab}
   #sceneWrap[data-k="dark"] canvas{display:block}
   #sceneWrap[data-k="dark"] iframe{display:none}
@@ -254,87 +201,50 @@
   #comicCount{color:#8FA3B8;letter-spacing:0}
   #comicFrame{position:relative;min-height:min(58vh,520px);overflow:hidden;border:3px solid #AEBBD0;background:#111A26;box-shadow:10px 10px 0 #243246;isolation:isolate}
   #comicFrame::before,#comicFrame::after{content:"";position:absolute;inset:10px;border:1px solid #506078;pointer-events:none;z-index:30}
-  /* 12 行不是 8 行 —— 行多了才切得出"一大格 + 三条扁的"这种落差。 */
+  /* 12 行网格用于组合大格与窄格。 */
   #comicArt{position:absolute;inset:0;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(12,1fr);gap:8px;padding:18px;text-align:left;background:radial-gradient(circle at 50% 45%,#26394b 0,#111A26 52%,#080B10 100%)}
   .comic-piece{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-width:0;overflow:hidden;padding:clamp(10px,2vw,22px);border:2px solid #AEBBD0;background:#162435;box-shadow:5px 5px 0 #080B10;opacity:0;transform:translateY(12px) rotate(-1deg);transition:opacity .28s,transform .35s cubic-bezier(.22,.9,.3,1)}
   .comic-piece.show{opacity:1;transform:none}
-/* 文字区要有依托：格子只有 237px 高（`min-height` 定的），一行大字加一行字幕就
-   吃掉四分之一，于是直接压在画面主体上 —— "听见了"正压在狗鼻子上。两层：45°
-   那道高光是原有的，底下从底部往上压暗那层是后加的，让字落在渐隐里而不是脸上。 */
+/* 字幕区叠加底部暗渐变，避免文字与画面主体混在一起。 */
   .comic-piece::after{content:"";position:absolute;inset:0;pointer-events:none;
     background:linear-gradient(135deg,transparent 55%,rgba(142,231,255,.12)),
                linear-gradient(to top,rgba(4,7,11,.72) 0,rgba(4,7,11,.26) 27%,transparent 54%)}
-/* 每格只留一行字 —— 那句字幕。原先还有一层 `<b>` 三字概括，去掉之后字幕升成主字
-   （加粗 + 加重阴影，它压在画面上，要能从亮底读出来）。字号 20px：rush 格可用宽
-   426−44=382，18 个全角字 × 20 = 360 一行放得下；door 那句仍折两行，门的上移另做。 */
+/* 每格保留一行主字幕。20px 字号可在 rush 格的 382px 可用宽度内容纳 18 个全角字。 */
   .comic-piece em{position:relative;z-index:1;display:block;color:#FFD089;font-style:normal;
     font-size:clamp(13px,1.4vw,20px);font-weight:700;line-height:1.42;
     text-shadow:0 2px 10px rgba(4,7,11,.92),1px 1px 0 #121923}
-/* 版面不是等分网格：5 格大小相近的话读下来全是同一个景别（"全是远景没意思"）。
-   现在上排三条窄格、下排两条宽格。那三条不是竖格：12×12 正方形网格里 4 列 × 6 行
-   是 281×238，整幅 1.73:1 的画幅切不出真竖格。所以 dog 格的头特写只能 slice 裁，
-   meet 会缩成中间一窄条。 */
+/* 上排三窄格、下排两宽格。头部特写用 slice 裁切，避免 meet 在横格内缩小画面。 */
   .comic-piece.door {grid-column:1 / 5; grid-row:1 / 7; background:#0d141d}
   .comic-piece.dog  {grid-column:5 / 9; grid-row:1 / 7; background:#332824}
   .comic-piece.man  {grid-column:9 / 13;grid-row:1 / 7; background:#0b0b0e}
   .comic-piece.rush {grid-column:1 / 7; grid-row:7 / 13;background:#1b2833}
   .comic-piece.laugh{grid-column:7 / 13;grid-row:7 / 13;background:#2a1f18}
-/* 这里原来是一个橙色五边形（`clip-path` 拼的 `comic-dog`）—— 它既没有头也没有腿，
-   而且"听见了"和"靠近"两格用的是同一个五边形，只有角度差一点。现在直接调
-   `dogFlat()`，和镇上那只、boss 里那只同一份几何。尺寸交给 viewBox：脚本按
-   `getBBox()` 现算，所以换姿态不用改这里。 */
+/* 漫画复用 dogFlat()，viewBox 由当前姿态的 getBBox() 计算。 */
   .comic-piece .comic-dogart{position:absolute;right:4%;top:4%;width:46%;height:45%;overflow:visible}
-/* 景别三档靠两件事分：viewBox 取哪一块（窗口）+ 怎么塞进格子（`fit`，见 DCROP）。
-   dog 格是头特写用 slice（窗口按宽铺满、上下裁掉，裁就是特写的定义），laugh
-   更近一档只到眼睛和嘴，rush 是远景、meet 完整 bbox。第一版写"一律 meet、
-   永远不用 slice"，理由没错结论反了：恰恰因为格子扁，方脸才塞不进去。 */
-  /* 三格的高度都不是 100%：底下要留字幕的位置。
-     格子 238px 高、内边距 22px、字幕 20px×1.42 ⇒ 字幕顶在 70% 处。
-     写 100% 的话狗嘴正好落在字幕上（看图才看得出来，代码上一个字都没错）。 */
+/* 景别由 DCROP 窗口和 fit 共同决定：特写 slice，远景 meet 显示完整 bbox。 */
+  /* 狗图底部留出字幕区；238px 格高下，字幕约从 70% 处开始。 */
   .comic-piece.dog .comic-dogart{right:0;top:0;width:100%;height:74%;overflow:hidden}
   .comic-piece.laugh .comic-dogart{right:0;top:0;width:100%;height:74%;overflow:hidden}
-/* `bottom` 在这里是死代码：基础样式给了 `top:4%` + `height:auto`，而绝对定位同时
-   给出 top 和 bottom、高度又 auto 属于过约束，CSS 规定忽略 bottom。原来写
-   `bottom:30%`（"狗站在地平线上"）实际让狗浮空 38px —— 狗脚停在 48%、线画在 70%。
-   现在上边显式写出来，地平线上移去接狗脚（挪线不挪狗，压狗会顶到下面的字幕）。 */
+/* 使用 top 定位狗图，地平线单独对齐狗脚；下压狗图会与字幕重叠。 */
   .comic-piece.rush .comic-dogart{right:auto;left:14%;top:4%;width:26%;height:auto;overflow:visible}
-/* 远景那格要有一条地平线，不然狗浮在空里。原来的 `#4A5F78` 在深蓝底上几乎读不出来
-   （出图只看到狗脚下一团模糊的椭圆影），提亮到 `#7C97B8` 才成一条线。这个百分比
-   跟着狗脚走：狗盒底在 128 ⇒ 从内容盒底 236 算起 108/234 = 46%，改 `.comic-dogart`
-   的 top/width 就得重算。判据在 `_logs/_comic5.py` 的 [4c] 段（狗脚与线的距离
-   ≤ 4px），别靠眼睛估。 */
+/* 地平线用 #7C97B8，与狗脚对齐：108/234 ≈ 46%。
+   修改 .comic-dogart 的 top/width 后需重算；_logs/_comic5.py [4c] 检查脚与线距离 ≤ 4px。 */
   .comic-piece.rush::before{content:"";position:absolute;left:0;right:0;bottom:46%;height:2px;background:#7C97B8}
-  /* 「冲过去」是动势，可 `dogFlat` 只会站和走，没有"前倾冲刺"这一档 ——
-     光靠步态相位，出图看着就是"一只站着的狗"。补三条速度线在它身后，
-     这是漫画表示位移的通用符号，比硬造一个姿势省事也更读得懂。
-     位置对着狗的躯干高度：地平线挪到 46% 之后，三条线要整个落在线以上
-     （`bottom:50%` ⇒ 线带 84~119，底边 119 压在地平线 128 上方 9px）。 */
+  /* 用三条速度线补充冲刺动势。线带位于 84~119，
+     bottom:50% 使其底边高于地平线 128 约 9px。 */
   .comic-piece.rush .comic-speed{position:absolute;left:0;bottom:50%;width:13%;height:15%;pointer-events:none}
-/* 这里原来是 `.comic-slab` —— 一条横贯全格的浅灰板（`top:8%;height:8%`），本意是
-   "平台顶面"。删掉是因为它悬在格子顶部、和门谁也不挨着（门在正中偏下），读出来
-   就是一条来路不明的亮线，不是"厚度"。门自己是竖椭圆 + 外圈弧光，单独在黑底上
-   就立得住。 */
-/* 门这一格的字幕是两句、断点写死（`COMIC[0].art` 里那个 `<br>`：让浏览器自己折
-   会断在"信/号"中间）。所以这格永远是两行、从 58% 开始，门底必须在 58% 以上 ——
-   现在门底 54%，留 4% 余量。换字数或换字号都要重核这条。宽收窄到 24% 才是竖椭圆
-   （281×0.24 = 67 宽、238×0.34 = 81 高）；原来 30%/34% 算下来是圆的，门洞不是圆的。 */
+/* 门字幕固定两行，从 58% 开始，门底设在 54% 留出间距。
+   修改文案或字号时需检查门与字幕是否重叠。 */
   .comic-piece .comic-door{position:absolute;left:50%;top:20%;width:24%;height:34%;border:2px solid #64748B;border-radius:50%;background:radial-gradient(ellipse,#273342 0,#050609 58%,#000 100%);box-shadow:0 0 22px #000,inset 0 0 18px #111;transform:translateX(-50%)}
   /* 同一枚门出现在两格：第 1 格在正中（剖面里那枚），第 4 格靠右（狗冲过去的那个）。 */
   .comic-piece .comic-door--right{left:78%}
-/* 下排格子是上排的一点五倍宽（426 vs 281），照搬百分比宽度会把门压成横椭圆 ——
-   窄的这格得单独收窄，门才是竖的。`top` 从 24% 改成 8%：原来 `top:24% + height:46%`
-   ⇒ 门底在 70%，而地平线画在 54%，门有 16% 埋在地面以下、看着浮在半空。现在
-   8+46 = 54，和地平线同底。 */
+/* 下排格宽 426px，上排 281px，门宽需分别设置以保持竖椭圆。
+   下排 top:8% + height:46% 与 54% 地平线对齐。 */
   .comic-piece.rush .comic-door{width:15%;top:8%;height:46%}
-  /* 从门洞荡出来的信号弧（同心半圆、开口朝右）。圆心必须跟着门洞中心走 ——
-     门是 `top:20%` + 高 `34%` ⇒ 中心 y = 37%。这两条是联动的：
-     动了门的 top/height 就得同量改这里，否则弧会飘在门上面（不会报错，只是错位）。 */
+  /* 信号弧圆心跟随门中心 y=37%；修改门的 top/height 时同步调整。 */
   .comic-piece .comic-emit{position:absolute;left:50%;top:37%;width:70%;height:70%;
     transform:translate(-50%,-50%);pointer-events:none}
-/* 第 3 格那个"人" —— 黑白简笔，照参考图重画的。参考图不内嵌：它带"豆包AI生成"
-   水印，AI 生成物不该进交付物；构图照搬（简笔人站在一块斜板上，头上一枚"人"字当
-   标注）。这个盒子的宽高比必须和 SVG 的 viewBox 一致，不然 `meet` 会把画缩到中间
-   一小条 —— 第一版板只占格子四成宽，看着像"人扶着一块小木片"。 */
+/* 第三格为黑白简笔重画，盒子比例与 SVG viewBox 对齐，避免 meet 缩小构图。 */
   .comic-piece .comic-man{position:absolute;left:3%;right:3%;top:3%;bottom:30%;overflow:visible}
   #comicCaption{min-height:2.2em;color:#C8D2DF;text-align:center;font-size:clamp(14px,2vw,19px);line-height:1.7;text-wrap:balance}
   #comicActions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
@@ -353,11 +263,8 @@
         transition:transform .62s cubic-bezier(.22,.9,.3,1)}
   #veil.down{transform:translateY(0);pointer-events:auto}
   #veil.thru{transform:translateY(100%);pointer-events:none}
-/* 幕上那段字：楷体、逐行出现、"电影光幕"的观感。`font-family` 要显式写 —— Zpix 那条
-   规则挂在 `#chat,#chat *` 上，这里不在它的射程内，不写就静默回落到系统宋体；
-   楷体用系统 KaiTi，不引外部资源。光晕是点名要的：三层由近到远、越远越淡，最外那层
-   负责把字"泡"在黑幕里，少了它字像贴上去的。`txApply` 按文案累计每行的 `--delay`，
-   `--fade` 独立管淡入，总时长与 JS 的 `TX_DONE` 同表。 */
+/* 幕上文字使用系统 KaiTi，配三层渐淡光晕；此处不受 #chat 的 Zpix 规则覆盖。
+   txApply 累计各行 --delay，--fade 控制淡入，总时长与 TX_DONE 对齐。 */
   #veilTx{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
           display:flex;flex-direction:column;align-items:center;
           color:#FFD089;text-align:center;
@@ -371,17 +278,12 @@
    所以楷体 20px 和像素 24px 各自等比，不必给两套写两遍。 */
           --vline:1.5em; --vtip:3.6em;
           --hintD:0ms} /* txApply 的累计时刻表同时写入 delay / hintD / TX_DONE */
-/* 两套文案并排放在 HTML 里（书店 5 行楷体 / 开发室 4 行像素白字），JS 只决定显示
-   哪一组（`#veilTx` 的 `data-set`）。留在 HTML 的两个理由：改文案不用翻 JS；
-   `pix-subset.py` 收的是正文文本节点，放 HTML 里一定收得到（放 JS 字符串里就得
-   另写收集逻辑，而"漏收"是静默的）。`--n` 由 `txApply()` 按当前这套重算。 */
+/* 字幕保留在 HTML 中，便于编辑并由 pix-subset.py 收集字形。
+   data-set 选择当前组，txApply 按组重算 --n。 */
   .vt-set{display:none;flex-direction:column;align-items:center;
           gap:var(--vtip,3.6em)}
-  /* 新增一套文案就得在这里加一条选择器，漏了是静默的：
-     幕上什么都不显示（`.vt-set` 全是 `display:none`），而 JS 那头一切正常 ——
-     `txN` 照样数到 5、`TX_DONE` 照样翻真、"幕上该有 5 行"这个判据和
-     "选择器漏了"完全解耦。所以探针的判据必须是 `txLit` 能涨到 5（真有一行
-     一行地亮起来），`txN===5` 单独成立不够。（`_wallgate.py` 第 ① 组） */
+  /* 新文案组需同步增加选择器，否则 .vt-set 保持 display:none。
+     验证时检查 txLit 增至 5；txN===5 只能证明节点存在。 */
   #veilTx[data-set="books"]  .vt-set[data-k="books"],
   #veilTx[data-set="dev"]    .vt-set[data-k="dev"],
   #veilTx[data-set="dark"]   .vt-set[data-k="dark"],
@@ -390,10 +292,7 @@
   #veilTx[data-set="won"]    .vt-set[data-k="won"],
   #veilTx[data-set="dispatch"] .vt-set[data-k="dispatch"]{display:flex}
   .vt-lines{display:flex;flex-direction:column;gap:var(--vline,1.5em)}
-/* 行距在这里，不在外层 `#veilTx` 上 —— 5 行被 `.vt-lines` 包起来之后它就够不着了，
-   原来那个 `gap:2.4em` 已经删掉，留着只会让人以为行距靠它。加 `.vt-lines` 时忘了
-   把行距搬下来，行距会从 90px 掉到 42px（正好等于行高）—— 缩略图上"疏朗"和
-   "紧凑"都能看成"排得挺整齐"，得量 top 间隔才看得出来。 */
+/* 行距由 .vt-lines 控制，外层 #veilTx 的 gap 不影响组内各行。 */
   .vt-l,.vt-hint{opacity:0}
   /* transition 只在撤掉动画时起作用（退场）：动画在跑的时候它不起效。
      幕往下沉时字是被幕整个带出屏幕的，所以这条其实只为复位那一下兜底。 */
@@ -401,10 +300,8 @@
   .vt-hint{font-size:13px;letter-spacing:.22em;
            text-shadow:0 0 6px rgba(255,214,150,.45),
                        0 0 20px rgba(255,196,110,.25)}
-/* 开发室这一套是普通的白字，不是光幕。光晕写在两个选择器上，所以两处都要显式
-   text-shadow:none —— 少盖一处就漏。24px 是 12 的整数倍、font-weight:400、
-   letter-spacing 取整数：Zpix 是 12px 点阵，非整数倍会把 1px 笔画糊成 2px。
-   line-height 1.7 比楷体那套的 2.1 紧。 */
+/* 开发室字幕为 Zpix 白字；两处显式清除 text-shadow。
+   字号、字距使用整数像素，font-weight:400 保持点阵轮廓。 */
   #veilTx[data-set="dev"]{color:#fff;text-shadow:none;
     font-family:'Zpix',ui-monospace,'Cascadia Mono','Consolas',monospace;
     font-size:24px;line-height:1.7;letter-spacing:0}
@@ -414,10 +311,7 @@
   #veilTx.on .vt-l{animation:vtLine var(--fade) ease-out both;
                    animation-delay:var(--delay,0ms)}
   @keyframes vtLine{from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none}}
-  /* 提示：先淡入，再交给闪烁。两条 animation 都写 opacity，后列出的赢 ——
-     所以 vtBlink 从自己的 delay 起接管，之前那段由 vtHint 的 `both` 填住。
-不用 `animation-iteration-count` 去拼：一条 keyframes 做不到
-     "先淡入一次、再无限呼吸"，硬拼要把它写成半程从 0 开始，那第一轮会闪回去。 */
+  /* vtHint 先淡入，vtBlink 到延迟时刻后接管 opacity，形成持续闪烁。 */
   #veilTx.on .vt-hint{animation:vtHint .9s ease-out both var(--hintD),
                                 vtBlink 1.6s ease-in-out calc(var(--hintD) + 900ms) infinite}
   @keyframes vtHint{from{opacity:0} to{opacity:1}}
@@ -425,14 +319,11 @@
   /* 快进（字没出完时点了一下）：全部立刻到位，提示立刻亮着闪 */
   #veilTx.full .vt-l{animation:none;opacity:1}
   #veilTx.full .vt-hint{animation:vtBlink 1.6s ease-in-out infinite;opacity:1}
-  /* REDUCE：整段不播 —— 字直接全在、提示常亮不闪（这条和 JS 里的 REDUCE 分支
-     是同一件事的两半，改一处要一起看） */
+  /* REDUCE 直接显示全部文字并保持提示常亮，与 JS 分支同步。 */
   @media (prefers-reduced-motion:reduce){
     #veilTx.on .vt-l,#veilTx.full .vt-l{animation:none;opacity:1}
     #veilTx.on .vt-hint,#veilTx.full .vt-hint{animation:none;opacity:1}
-    /* 那三个点也停 —— 但不删：`?lag=` 那段等待本来就还在（它是 setTimeout，
-       不是 CSS 动画），把点也去掉就只剩一段空白，反而比不改更难读。
-       停成三个常亮的点，等于一个静态的省略号。 */
+    /* 减动效时思考点常亮；保留节点以覆盖 ?lag= 的异步等待。 */
     .c-dot{animation:none;opacity:1}
   }
 </style>
@@ -442,9 +333,7 @@
 <canvas id="snow"></canvas>
 <div id="hud"></div>
 
-<!-- 聊天面板。骨架写死在这儿，内容（头像 / 消息 / 选项）全部由 JS 填 ——
-     因为头像不是图片，是当场把镇上那只狗画一遍再裁到头（见 dogHead()），
-     这样改狗它自动跟着变，也不会多出一个要同步的 png 文件。 -->
+<!-- 聊天骨架固定，消息与选项由 JS 填充；头像通过 dogHead() 生成。 -->
 <div id="chat">
   <div class="c-top">
     <div class="c-av" id="c-avTop"></div>
@@ -455,10 +344,7 @@
   <div class="c-opts" id="c-opts"></div>
 </div>
 
-<!-- 公告板。点镇上那栋「公告板」弹出来的木头牌子。六条文案都是原话，一字未改
-     （含句尾那个 `；`）；第 6 条没有分号，不是漏的。编号在 HTML 里不写，交给
-     CSS counter。4 个 `.n-nail` 必须是 `#noticeBoard` 的前 4 个子元素，钉子位置
-     由 `:nth-child` 定。 -->
+<!-- 公告板编号交给 CSS counter；四个 .n-nail 须为 #noticeBoard 的前四个子节点。 -->
 <div id="notice" role="dialog" aria-modal="true" aria-labelledby="n-title">
   <div id="noticeBoard">
     <i class="n-nail"></i><i class="n-nail"></i><i class="n-nail"></i><i class="n-nail"></i>
@@ -477,28 +363,16 @@
   </div>
 </div>
 
-<!-- 井。`src` 故意留空 —— 它在黑幕落下的同一刻才由 sceneArm() 填上。
-     一直挂着 src 会让井在页面打开时就跑起来（它自己有个 rAF 钟），
-     而小镇这一页的原则是"没进去的东西不许占资源"。
-`?gate=1`：填上之后它仍然不跑 —— 那 2.2 秒入场要等 `wellGo()`
-     放行才起钟。原来它从填 src 那一刻就自己走，整段演在黑幕后面。 -->
-<!-- 暗房那张 canvas 和井那个 iframe 是兄弟，谁显示由 `#sceneWrap` 的
-     `data-k` 决定（CSS 见上）。两个都摆着、永远的只有一个可见 ——
-     这比"需要时插一个元素"少一条只在运行时才会炸的路径。 -->
+<!-- 井的 src 延迟到 sceneArm() 落幕时设置，避免提前运行 rAF。
+     ?gate=1 继续等待 wellGo() 放行，再启动 2.2 秒入场。 -->
+<!-- 暗房 canvas 与场景 iframe 并列，#sceneWrap[data-k] 控制可见项。 -->
 <div id="sceneWrap"><canvas id="gal"></canvas><iframe id="scene" title="井" tabindex="-1"></iframe><button id="gal-esc" type="button">退出</button></div>
 <div id="vortex" aria-hidden="true"><div id="comic"><div id="comicHead"><span>FIELD NOTE / SIGNAL EVENT</span><span id="comicCount"></span></div><div id="comicFrame"><div id="comicArt"></div></div><div id="comicCaption"></div><div id="comicActions"><button id="comicNext" type="button">补上一块</button><button id="comicSkip" type="button">跳过过场</button></div></div></div>
 <div id="cgPlace" aria-live="polite"><div id="cgCard"><div id="cgKicker">STORY PLACEHOLDER</div><h2 id="cgTitle"></h2><p id="cgText"></p><button id="cgNext" type="button">继续</button></div></div>
 <div id="storyToast" aria-live="polite"></div>
 
-<!-- 黑幕。它同时是"过场"和"进门的按钮"：点书店 → 幕落下 → 再点幕 → 才到井。
-     所以它不是纯装饰 —— 有 pointer-events，是这一路上唯一能点的东西。`--i` 是每行
-     的序号，CSS 用它算 animation-delay，所以行序由 DOM 顺序决定，改行序要连着改
-     `--i`。提示不放进 .vt-lines —— 它要和那 5 行隔开一段距离。 -->
-<!-- 幕上有两套字，由 `#veilTx` 的 `data-set` 决定显示哪一组（CSS 见上）。
-     提示文案各跟各的（书店「点击任意处进入」/ 开发室「点任意处开始」），
-     所以 `.vt-hint` 放在各自的 `.vt-set` 里，不是共用一个。
-`--i` 保留为行序标记；实际 delay 由 txApply 按 DOM 顺序累计。
-       每套都独立从第 0 行开始，不继承上一套的时刻。 -->
+<!-- 黑幕同时接收进入点击。提示位于 .vt-lines 外，与正文保持独立间距。 -->
+<!-- data-set 选择字幕组；每组自带提示，txApply 按 DOM 顺序累计延迟。 -->
 <div id="veil" role="button" tabindex="0" aria-label="继续"><div id="veilTx" data-set="books">
   <div class="vt-set" data-k="books">
     <div class="vt-lines">
@@ -519,10 +393,7 @@
     </div>
     <div class="vt-hint">点任意处开始</div>
   </div>
-  <!-- 暗房这一套不写 `#veilTx[data-set="dark"]` 覆盖块：要的是"进入的幕和书店
-       一样"，就是那套暖黄光晕 + 楷体，全在基样式里。写覆盖块只会把同一件事
-       说两遍，而且将来改基样式时这套不跟着变。5 行，`--i` 从 0 数起
-       （各套各从 0 数，不是接着开发室的 4 往下数）。 -->
+  <!-- 暗房沿用默认暖金楷体光晕，各组行号独立从 0 开始。 -->
   <div class="vt-set" data-k="dark">
     <div class="vt-lines">
       <div class="vt-l" style="--i:0">没熟习外出的我也期盼着风景</div>
@@ -533,10 +404,7 @@
     </div>
     <div class="vt-hint">点击任意处进入</div>
   </div>
-<!-- 游戏厅这一套，和暗房一样不写覆盖块 —— 要的就是基样式里那套暖金楷体 + 三层光晕
-     + 逐行淡入，写覆盖块等于把同一件事说两遍。块上的 `data-k` 必须和 `txApply` 传的
-     key 对上：对不上时没有任何选择器匹配，5 行字全是 `display:none`、幕一片纯黑，
-     而 JS 那头一切正常（`txN` 照数到 5），看代码看不出病。第 4、5 句是一句跨两行。 -->
+<!-- 游戏厅沿用默认字幕样式，data-k 必须与 txApply 的 key 一致。 -->
   <div class="vt-set" data-k="arcade">
     <div class="vt-lines">
       <div class="vt-l" style="--i:0">在现实中总是难以经历太多</div>
@@ -569,11 +437,8 @@
     </div>
     <div class="vt-hint">点击任意处进入</div>
   </div>
-<!-- 打赢之后那一段。文案原样照录，一字未改：「……／也就是说，大狗嚼赢了！／大狗在BOSS
-     被腰斩的身体中找到了入口／"原来是入口啊，那不得不进去了"／于是……」。和暗房 /
-     游戏厅一样不写覆盖块 —— 要的就是基样式里那套暖金楷体 + 三层光晕 + 逐行淡入。
-     第 1 行和最后一行各只有一个省略号（原文如此），是停顿不是空行，别合并也别删 ——
-     `txReadMs` 给每个 `…` 记 220ms。 -->
+<!-- 战后文案沿用暖金楷体、三层光晕和逐行淡入。
+     首尾的省略号用于停顿，txReadMs 为每个 … 计 220ms，不能当空行删除。 -->
   <div class="vt-set" data-k="won">
     <div class="vt-lines">
       <div class="vt-l" style="--i:0">……</div>
@@ -602,24 +467,17 @@ var W = parseInt(Q.get("w"),10) || window.innerWidth;
 var H = parseInt(Q.get("h"),10) || window.innerHeight;
 var REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* 等距投影：x 向屏幕右下、y 向屏幕左下、z 向上，2:1 的经典等距。一台函数管全部
-   坐标，所以房子、树、地面用的是同一个空间。`?yaw=` 不是"把图片转一下"，是真的
-   换视角 —— 等距投影是线性映射、可以复合，绕 z 轴转 θ 再照原式投影等价于"相机在
-   固定俯角上绕着镇子走 θ"，所以改这一个函数房子、坡面、雪、烟、影子全都跟着对。
-   `+ CENW*TH` 是把旋转中心挪回原点的常数差，让 yaw=0 时和原式逐像素相同。 */
+/* 2:1 等距投影，x/y 分别向右下/左下，z 向上。
+   ?yaw= 先绕 z 轴旋转，再投影；CENW*TH 保持 yaw=0 与原点偏移一致。 */
 var TW = 54, TH = 27, ZH = 26;
 var CENW = 5.7;   // 镇的旋转中心，和 build() 里那个 CEN 是同一个数
 var DEG = Math.PI / 180;
-/* 拖动默认就开着（见文件末尾），`?yaw=off` 才关。早先是默认关、靠 `?yaw=drag` 打开，
-   于是不得不再养一份 `town-drag.html` —— ShellExecute（双击 / Start-Process）打开
-   file:// URL 会把问号后面那一截吃掉，参数静默失效："页面看着正常，就是拖不动"。
-   那个绕法本身就是坑：两份几乎一样的文件，选错就复现同一个症状、毫无提示。
-   常开没有代价，夹子只夹拖动，不拖就什么都不发生。 */
+/* 拖动默认开启，?yaw=off 关闭。双击 file:// 入口可能丢失查询参数，
+   因此不依赖 ?yaw=drag，也无需维护独立的拖动版页面。 */
 var DRAG = Q.get("yaw") !== "off" || location.hash === "#drag";
 var YAW = 0, YC = 1, YS = 0;
 function setYaw(rad){ YAW = rad; YC = Math.cos(rad); YS = Math.sin(rad); }
-/* 初始角度只看 `?yaw=<度>`；`?yaw=drag` / `off` 都不是数，parseFloat 给 NaN → 0。
-   别把它写成 `DRAG ? 0 : ...` —— DRAG 常开之后那会把探针角度一起吃掉。 */
+/* 初始角度只由数值 ?yaw= 决定；drag/off 解析为 NaN 后回退到 0。 */
 setYaw((parseFloat(Q.get("yaw")) || 0) * DEG);
 function P(x, y, z){
   var dx = x - CENW, dy = y - CENW;
@@ -631,16 +489,12 @@ function pts(list){ return list.map(function(p){ var q = P(p[0],p[1],p[2]); retu
 var NS = "http://www.w3.org/2000/svg";
 function el(n, at){ var e = document.createElementNS(NS, n); for (var k in at) e.setAttribute(k, at[k]); return e; }
 
-/*  配色：黄昏的雪镇。冷底 + 暖窗 —— 窗口的暖光是全图唯一的热源，所以它一亮
-    眼睛就知道该看哪儿，"哪里亮 = 哪里有内容"就是这么来的。
-    天空是实色一块 #0C0E16 加 26 颗散星，不是渐变：带渐变的两版都试过，
-    底部总会亮出一块没有来源的紫（镇上的暖光都有来源，窗和路灯）。 */
+/* 冷色雪地与暖窗配色；天空使用 #0C0E16 实色和 26 颗散星。 */
 var C = {
   // 天空：底色 + 星。星的位置是闭式不是随机，理由见 build() 里那段。
   sky:"#0C0E16", skyStar:"#C4D0E6",
   // 地比屋顶冷：暖色的屋顶才浮得出来。全白的话整张图会糊成一片。
   ground:"#C9D8E8", groundSide:"#93A5BA", groundDeep:"#7C8B9E",
-  // path / pathEdge 已随路面一起删掉，见 ground() 里那段说明。别再加回来。
   plaster:"#F0E1C6", wood:"#C4894F", stone:"#9FAFC0", brick:"#C06A52",
   // 深一号的木：梁、窗台、栏杆、招牌杆。和墙面的 wood 拉开，不然全是同一块
   beam:"#8A5A32",
@@ -652,22 +506,16 @@ var C = {
   glow:"#FFBE63"
 };
 
-/* 高矮本身在说话：酒馆要盖两层（不然"外挑二层"没处放），游戏厅要趴下去
-   （低而宽），暗房要小到一眼看出是杂物间，钟楼要一个人高出一头。
-   旧版七栋只差 0.3 —— 天际线是平的，等于没有天际线。 */
+/* 房屋以高宽、层数和门面区分：酒馆两层、游戏厅低宽、暗房小、钟楼最高。 */
 var TOWN = [
   // key       名字            格子(x,y)  宽 深 高  墙色        顶色           窗(相对格)
   {k:"tavern", n:"调度室",        x:2, y:3, w:2.4, d:2.2, h:2.10, wall:"wood",    roof:"roofRed",    lit:3},
   {k:"books",  n:"书店",        x:5.8,y:2.2,w:2.0,d:1.55,h:2.15, wall:"plaster", roof:"roofBlue",   lit:2},
   {k:"arcade", n:"游戏厅",      x:1.6,y:6.6,w:2.4,d:2.0,h:1.05, wall:"brick",   roof:"roofPurple", lit:3},
   {k:"dark",   n:"暗房",        x:5.4,y:6.4,w:1.6,d:1.6,h:1.15, wall:"stone",   roof:"roofGreen",  lit:1},
-  // 钟楼往右让一步：原来 4.2 正压在酒馆肩上，把酒馆右端的山墙整个遮掉了。
-  // 最高的一栋站中间是对的，但"中间"不该是别人的门面。
-  // 钟楼的顶是刷白的（雪盖满了整个尖顶），所以这里给的是雪色而不是瓦色 ——
-  // 数据要和 tower() 实际用的颜色一致，不然下次读表会以为它还是蓝顶。
+  // 钟楼右移以露出酒馆山墙；表内顶色与 tower() 的全雪顶保持一致。
   {k:"tower",  n:"信号塔",      x:4.5,y:4.7,w:1.6,d:1.6,h:3.60, wall:"stone",   roof:"roofSnow",   lit:1},
-/* 显示名叫「开发室」（原来是「你家」）。只改了显示名 —— key 保留 `home`，它是那栋房
-   的几何/外观标识（`homeProps()`、烟囱、台阶、篱笆四处都按它分支）。 */
+/* 显示名为开发室，几何分支保留 home key，供家什、烟囱、台阶和篱笆使用。 */
   {k:"home",   n:"开发室",      x:8.2,y:4.8,w:1.8,d:1.8,h:1.40, wall:"plaster", roof:"roofRed",    lit:2},
   {k:"board",  n:"公告板",      x:8.0,y:8.0,w:1.2,d:0.9,h:1.10, wall:"wood",    roof:"roofGreen",  lit:0}
 ];
@@ -679,17 +527,12 @@ function total(){
   return Object.keys(S.clicks).reduce(function(sum, k){ return sum + (S.clicks[k] || 0); }, 0);
 }
 
-/*  原语：全文件只有这一套参数顺序
-   (平面坐标, 边界1, 下沿, 边界2, 上沿)。
-   town-tavern.html 里就是因为存在第二套同参数个数的顺序，花箱和灯笼
-   把 (平面,起点,宽) 写成了 (起点,平面,宽)，一块色块落到墙外 0.9 的空中。
-   只有一套，就没有这个机会。 */
+/* 墙面原语统一参数顺序：(平面坐标, 边界1, 下沿, 边界2, 上沿)。 */
 function poly(g, corners, fill, sw, op){
   var a = {points: pts(corners), fill: fill, "stroke-linejoin":"round"};
   if (sw) a.stroke = C.line, a["stroke-width"] = sw;
   if (op !== undefined) a.opacity = op;
-  // ?dbg=1 把越界的点染成品红。坐标写错时最省时间的一件工具：一眼看到
-  // 那块色落在哪儿，比回去读代码猜快得多。
+  // ?dbg=1 将越界点染为品红，便于定位几何错误。
   if (Q.get("dbg") && corners.some(function(c){
       return c[0] < -1.6 || c[0] > 12.6 || c[1] < -1.6 || c[1] > 12.6 || c[2] < -1.2 || c[2] > 6.8; }))
     a.fill = "#FF2D95", a.stroke = "#FF2D95", a["stroke-width"] = 1;
@@ -704,9 +547,7 @@ function barY(g, yf, ax, az, bx, bz, t, fill){
 }
 function off(n){ return (Q.get("off") || "").split(",").indexOf(n) >= 0; }
 
-/* 窗玻璃。带 class/data-on 是为了 relight() —— 触发三次后全镇点亮那一下，
-   数的就是 .win[data-on=1]。所以哪怕暗房那种"不该亮"的窗也得走这里，
-   只是初始 on=false。 */
+/* 所有窗都保留 class/data-on，由 relight() 统计和更新；暗房初始 on=false。 */
 function pane(g, yf, x0, z0, x1, z1, on, sw){
   g.appendChild(el("polygon", {points: pts([[x0,yf,z1],[x1,yf,z1],[x1,yf,z0],[x0,yf,z0]]),
     class:"win", fill: on ? C.winLit : C.winDark, stroke:C.line, "stroke-width":(sw||1.1),
@@ -720,46 +561,32 @@ function mullion(g, yf, x0, z0, x1, z1, nv, nh){
     rectY(g, yf, x0, mz-0.014, x1, mz+0.014, C.line, 0); }
 }
 
-/* 屋面坡度 0.60（约 31°）。等距投影里"后坡能看见多宽"几乎只由坡度决定：
-   屏上宽度 = 后坡进深 × (24.138 − 23.244 × tanθ)，θ = 46.1° 时括号归零 ——
-   那是相机方向 (−1,−1,−1.038) 在屏幕上的零位移方向。46° 附近是重灾区（45° 只剩
-   1 像素、40° 也只有 5 像素），渲染成屋脊边一条又细又硬的楔形，看着就像"没有"。 */
+/* 坡度 0.60（约 31°）。后坡屏宽 = 进深×(24.138−23.244×tanθ)；
+   θ 接近 46.1° 时投影宽度趋近零，后坡会退化成细楔形。 */
 var PITCH = 0.60, SNOW_T = 0.16, SNOW_COVER = 1.0;
-/* 屋脊落在进深的 58% 处，在正中前面一点。这一格之差决定了房子的比例：
-   屋脊在中点时，前半坡的进深 = 后半坡 = d/2，投影出来整个屋顶在屏幕上
-   比墙还高，七栋全成了"白顶压着一条墙"。屋脊前移把前半坡压短 ——
-   前半坡是唯一看得见瓦色的那半坡，它短了，墙才重新当家。 */
+/* 屋脊位于进深 58% 处，缩短可见前坡，保持屋顶与墙面的视觉比例。 */
 var RIDGE = 0.58;
 
-/* 雪：翻过屋脊的一整片 —— 分两次画会在屋脊上留下两条描边 = 一道缝。三个数各对应
-   一条约束：cover 全镇一个常数（每段不同会让下沿成锯齿，读起来"厚度不均"）；
-   上表面一条折带、中缝不落笔；右端截面的上下两条边是同一条折线、只差一个竖直的
-   SNOW_T，所以剖面处处与屋面等厚，"雪顶和屋顶不平行"结构上不可能发生。 */
+/* 雪层跨屋脊连续绘制，避免重复描边。cover 全镇统一；
+   剖面的上下沿共用折线并相差 SNOW_T，保持雪层等厚。 */
 function snowCap(g, xa, xb, yMid, zR, yFr, zFr, yBk, zBk, th, cover){
   th = th || SNOW_T;
   cover = (cover === undefined ? SNOW_COVER : cover);
   var SLf = (zFr - zR) / (yFr - yMid), SLb = (zBk - zR) / (yBk - yMid);
-  /* cover = 1 时雪舌正好停在檐口，不外挑（外挑会和檐口板的描边叠成
-     一条毛边，就是之前"边缘很奇怪"那件事）。代价是四个顶色被吃掉，
-     全镇白成一片 —— 这是有意接受的：区分七栋从此靠体量、门面和烟囱的砖色，
-     不靠瓦色。想找回瓦色就把这个数调小，一个数就够，不用动别处。 */
+  /* cover=1 使雪停在檐口，不与檐口描边叠出毛边；房屋依靠体量、门面和烟囱区分。 */
   var yFl = yMid + (yFr - yMid) * cover, zFl = zR + SLf * (yFl - yMid);
   var yBl = yMid + (yBk - yMid) * cover, zBl = zR + SLb * (yBl - yMid);
   var zT = zR + th;
   poly(g, [[xa,yFl,zFl+th],[xa,yMid,zT],[xa,yBl,zBl+th],
            [xb,yBl,zBl+th],[xb,yMid,zT],[xb,yFl,zFl+th]], C.roofSnow, 1.1);
-  /* 两片剖面要压得比雪面暗得多。只差 0.08 的时候雪舌读不出来，
-     整块雪就成了一片贴在瓦上的白纸 —— 而"这是有厚度的一层雪"全靠
-     这圈暗边。 */
+  /* 雪层剖面加深，突出厚度。 */
   poly(g, [[xa,yFl,zFl+th],[xb,yFl,zFl+th],[xb,yFl,zFl],[xa,yFl,zFl]], shade(C.roofSnow,-0.17), 1.0);
   poly(g, [[xb,yFl,zFl+th],[xb,yMid,zT],[xb,yBl,zBl+th],
            [xb,yBl,zBl],[xb,yMid,zR],[xb,yFl,zFl]], shade(C.roofSnow,-0.28), 1.0);
 }
 
-/* 双坡屋顶。两个约束：① 屋面在墙线处正好等于墙头 —— 反过来把檐口钉在墙头高度，
-   屋面在墙线那里就高出墙头一截，上边裂开一条缝。② 烟囱必须画在后坡之后、前坡
-   之前，否则挡着它的那半个屋顶压不住它（放到屋顶 x 范围之外时视线会从外侧绕过去，
-   整根全露着），`mid` 这个回调就是留给它的。返回的 R 给门口的家什用。 */
+/* 屋面在墙线处与墙头同高。mid 回调在后坡之后、前坡之前画烟囱，保证遮挡顺序。
+   返回 R 供门口家什定位。 */
 function gableRoof(g, x, y, w, d, h, roof, gableCol, mid, o){
   o = o || {};
   var OVS = o.ovs === undefined ? 0.18 : o.ovs;
@@ -781,25 +608,18 @@ function gableRoof(g, x, y, w, d, h, roof, gableCol, mid, o){
   return R;
 }
 
-/* 烟囱：骑在后坡上，高度得跟着坡度走 —— "高出屋脊多少" = 13.5×后移量 + 26×高出量，
-   屋面改缓屋脊就降低，不跟着调会被后坡的雪糊掉。两个尺寸都是踩出来的：cw 给到 0.46
-   时屏上 44 像素宽、比门还胖，读出来是个带白盖的灰箱子；cy 从 0.28d 挪到 0.34d，
-   越靠后从屋脊线上探出来的部分越多（一根 0.6 高的烟囱能长出半个墙）。 */
+/* 烟囱位于后坡，露出屋脊的高度 = 13.5×后移量 + 26×高出量。
+   修改屋面坡度或烟囱位置时需同步检查露出高度与屏幕宽度。 */
 function chimney(g, R, x, y, w, d, h, tall, col){
   var cx = x + w*0.16, cy = y + d*0.34, cw = Math.min(0.30, w*0.13), cd = cw;
   var ch = R.zr + (tall ? 0.56 : 0.46), zb = R.zr - 0.5;
-  /* 砖色而不是石头色。烟囱在半数机位上都落在别家的门脸上 —— 灰石在
-     深色门脸前面是一根中性的柱子，读不出它属于谁；砖色一上去，它立刻
-     归给下面那栋红顶的房子。这是全镇唯一一处"颜色在说明归属"。 */
+  /* 烟囱用砖色，在深色门面前区分所属房屋。 */
   col = col || C.brick;
   rectY(g, cy+cd, cx, zb, cx+cw, ch, shade(col,-0.16), 1.4);
   rectX(g, cx+cw, cy, zb, cy+cd, ch, shade(col,-0.30), 1.4);
   faceTop(g, cx, cy, cw, cd, ch, shade(col,0.08), 1.4);
   if (!off("snow")) faceTop(g, cx-0.05, cy-0.05, cw+0.10, cd+0.10, ch+0.05, C.roofSnow, 0, 0.92);
-/* 烟：三团，越往上越大、越淡、越往右飘。数值照搬 A/B 页（`town-tavern.html` 里那
-   三个四元组）—— 那是定稿的那一版。三团都是静止的：烟一动就是装饰性动效，而这一页
-   的动效额度留给"亮灯 = 这里有内容"；真要让它飘，挂一个 rAF 抬 cy 就行。位置在
-   烟囱口中心，烟囱是细的，用角点会偏出半根。 */
+/* 三团静态烟按高度递增尺寸、递减透明度并向右偏移，位置取烟囱口中心。 */
   if (!off("smoke")){
     var ctop = P(cx + cw/2, cy + cd/2, ch);
     [[0.05,-0.42,7,0.30],[0.22,-0.78,9,0.22],[0.44,-1.16,11,0.14]].forEach(function(s){
@@ -809,9 +629,7 @@ function chimney(g, R, x, y, w, d, h, tall, col){
   }
 }
 
-/* 凸包（Andrew monotone chain）。给 ground() 的岛轮廓去凹角用，见那边的注释。
-   `<= 0` 连共线的点也一起弹掉 —— 留着的共线点在渲染上没差别，却会让
-   后面按点算包围盒之类的代码多绕几圈。 */
+/* Andrew monotone chain 凸包用于消除岛轮廓凹角；<=0 同时移除共线点。 */
 function hull(p){
   var q = p.slice().sort(function(a,b){ return a[0]-b[0] || a[1]-b[1]; });
   function cr(o,a,b){ return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]); }
@@ -822,11 +640,7 @@ function hull(p){
   return lo.concat(up);
 }
 
-/*  一栋房子
-   排列顺序就是画家算法：后画的盖住先画的。用中心点的 x+y 当深度。
-
-   七栋的差别靠体量和门面，不靠颜色。旧版每栋都是同一个盒子换墙色，
-   所以整条天际线是平的，也没有任何一处告诉你"这栋是干嘛的"。 */
+/* 房屋按中心 x+y 排序，以画家算法处理遮挡；体量和门面体现建筑差异。 */
 function building(b){
   var g = el("g", {class:"b", "data-k":b.k, "data-name":b.n});
   var body = el("g", {class:"body"});
@@ -834,18 +648,15 @@ function building(b){
   var wall = C[b.wall], roof = C[b.roof];
   var K = b.k;
 
-  /* 接触阴影：让房子"坐"在雪地上，不是浮着。
-     挂在 g 上而不是 body 上 —— body 在 hover 时整体抬起 3 像素，阴影跟着
-     抬就成了"影子也离开地面"。足迹的屏幕半宽是 (w+d)/2·TW/2，即 (w+d)·TW/4；
-     乘 0.92 收一点，让它只从墙根渗出来。 */
+  /* 接触阴影挂在 g 上，避免随 hover 的 body 抬升。
+     投影半宽为 (w+d)·TW/4，再乘 0.92 收入墙根。 */
   if (!off("shadow")){
     var shw = (w + d) * TW / 4, shc = P(x + w/2, y + d/2, 0);
     g.appendChild(el("ellipse", {cx:shc[0].toFixed(1), cy:shc[1].toFixed(1),
       rx:(shw*0.92).toFixed(1), ry:(shw*0.46).toFixed(1), fill:"url(#contact)"}));
   }
 
-  /* 公告板是亭子不是房子：两根柱子 + 一块板 + 一个小顶。它没有墙，
-     所以不开门不开窗 —— 一栋"没有门的房子"比一个公告栏更让人困惑。 */
+  /* 公告板使用柱、板和平顶，不绘制房屋墙面、门窗。 */
   if (K === "board"){ boardKiosk(body, x, y, w, d, h, roof);
     return finish(g, body, b, x, y, w, d, h + 0.13); }
   if (K === "tower"){ tower(body, x, y, w, d, h, roof);
@@ -863,8 +674,7 @@ function building(b){
     rectY(body, y+d, x, 0, x+w, Z1, shade(wall,-0.06), 1.6);
     rectX(body, xR, y, Z1, y+d+JET, h, shade(wall,-0.24), 1.6);
     rectY(body, yF, x, Z1, x+w, h, shade(wall,-0.10), 1.6);
-    // 侧墙的两扇窗。那面墙是全镇最大的一块纯色（2.2×2.1），不破一下的话
-    // 它比正脸还抢眼 —— 而它什么也没说。
+    // 侧墙开两扇窗，打破大块纯色。
     [0.28, 1.02].forEach(function(q){
       rectX(body, xR+0.006, y+q, Z1+0.26, y+q+0.34, Z1+0.82, C.winDark, 1.1);
       rectX(body, xR+0.010, y+q+0.15, Z1+0.26, y+q+0.19, Z1+0.82, C.line, 0);
@@ -899,9 +709,7 @@ function building(b){
     // 玻璃从右边起 —— 左边留给门，两者重叠的话门会压在橱窗上。
     rectY(body, yF+0.006, x+0.14, 0.08, x+w-0.14, h-0.44, "#3A2E22", 1.4);
     pane(body, yF+0.012, x+0.82, 0.18, x+w-0.22, h-0.52, b.lit > 0, 1.2);
-    /* 橱窗里两排彩色书脊。"这是书店"只有这一处说得清楚 —— 高窄的体量、
-       蓝顶、深色门脸，三样加在一起仍然只是一间"铺子"；一排书脊一画上去，
-       它就不再是别的任何东西。画在玻璃之后、窗棂之前＝书在窗格后面。 */
+    /* 两排书脊画在玻璃之后、窗棂之前，作为书店识别特征。 */
     [0, 1].forEach(function(row){
       var z0 = 0.30 + row * 0.70, hs = row ? 0.32 : 0.44;
       for (var i = 0; i < 6; i++){
@@ -929,8 +737,7 @@ function building(b){
         i%2 ? shade(roof,0.30) : C.roofSnow, 1.1);
     }
   } else if (K === "dark"){
-    // 暗房：最小的一栋。正面整块钉上板，只留高处一个小窗透出红灯。
-    // 门口也不点暖光 —— 全镇唯一一处不欢迎你进去的地方。
+    // 暗房正面封板，仅保留高处红灯窗，门口不加暖光。
     rectY(body, yF+0.006, x+0.14, 0, x+w-0.14, h-0.34, "#2E2620", 1.4);
     for (var q = 0; q < 3; q++)
       rectY(body, yF+0.014, x+0.20, 0.08+q*0.24, x+w-0.20, 0.22+q*0.24, shade(C.beam,-0.20-q*0.04), 1.0);
@@ -941,7 +748,7 @@ function building(b){
       body.appendChild(el("ellipse", {cx:rp[0], cy:rp[1], rx:TW*0.30, ry:TH*0.34, fill:"url(#glowRed)"}));
     }
   } else {
-    // 你家：最普通的一扇窗，剩下的留给门、台阶和篱笆
+    // 开发室：普通窗配门、台阶和篱笆。
     pane(body, yF+0.012, x+0.22, h-0.62, x+0.22+Math.min(0.46,w*0.30), h-0.20, b.lit > 0, 1.2);
     mullion(body, yF+0.016, x+0.22, h-0.62, x+0.22+Math.min(0.46,w*0.30), h-0.20, 2, 2);
   }
@@ -957,11 +764,9 @@ function building(b){
   rectY(body, yF+0.005, dx, 0, dx+dw, dh, "#5A4331", 1.4);
   body.appendChild(el("circle", {cx:P(dx+dw*0.78, yF, dh*0.52)[0], cy:P(dx+dw*0.78, yF, dh*0.52)[1],
     r:1.6, fill:"#D9B25E"}));
-  // 你家：门前一级台阶。必须画在门之后 —— 台阶在门前（y 更大）＝离相机
-  // 更近，近的必须后画；顺序反了门会压在台阶上，看着像门陷进地里。
+  // 开发室台阶在门之后绘制，符合前后遮挡顺序。
   if (K === "home"){
-    // 三面都画。只画顶面 + 正面的话，右边缺一条竖边，那级台阶看起来是
-    // 一块浮在地上的板，不像台阶。
+    // 台阶同时绘制顶面、正面和侧面，保留厚度。
     var gx0 = dx-0.12, gx1 = dx+dw+0.12, gz = 0.15;
     rectX(body, gx1, yF+0.02, 0, yF+0.30, gz, shade(C.stone,-0.26), 1.2);
     rectY(body, yF+0.30, gx0, 0, gx1, gz, shade(C.stone,-0.18), 1.2);
@@ -980,10 +785,7 @@ function building(b){
   return finish(g, body, b, x, y, w, d, R.zr);
 }
 
-/* 名牌：悬停时浮在屋檐上方的一小块。它不是场景里的招牌 —— 是 UI，
-   所以不按投影画、不贴墙，直接悬在屋脊上方挂一根引线。理由：贴墙的招牌
-   一定会和门窗/屋檐打架（这栋的窗在哪儿，招牌就得让到哪儿），而且一旦
-   房子变高变矮就要重算。悬在上面则和建筑无关，七栋永远一致。 */
+/* 悬停名牌使用屏幕空间，固定在屋脊上方，避免与墙面门窗重叠。 */
 function finish(g, body, b, x, y, w, d, topZ){
   var sg = el("g", {class:"sign"});
   var cx = P(x + w/2, y + d/2, 0)[0];
@@ -1014,17 +816,12 @@ function barrel(g, bx, by, r, hgt){
 }
 function tavernProps(g, x, y, w, d, jet){
   var fy = y + d + jet;
-  /* 桶原本在酒馆左前方（x−0.30）。那两个位置在屏幕上正落在游戏厅的
-     屋脊尖端上方：等距投影里 (1.7,5.75) 和游戏厅的脊尖 (4.0,7.86) 只差
-     一个世界方向 (−1,−1)，位移为 0 —— 于是桶看起来是摆在紫色屋顶上的。
-     挪到门左边、贴着自家橱窗：背景换成酒馆自己的亮窗，归属一望即知。
-     只留一个：长凳已经占了橱窗左半边。 */
+  /* 酒桶放在酒馆门左侧、橱窗前，仅留一个以避开长凳。
+     左前方旧位置与游戏厅屋脊投影重叠，会使酒桶看似落在屋顶上。 */
   barrel(g, x + w - 0.95, fy + 0.50, 0.15, 0.58);
   // 长凳
   faceTop(g, x + 0.42, fy + 0.56, 0.62, 0.18, 0.30, shade(C.wood,-0.22), 1.1);
   rectY(g, fy + 0.74, x + 0.42, 0, x + 1.04, 0.30, shade(C.wood,-0.32), 1.1);
-  // 这里原本挂着一块吊招牌。删了：它悬在门口正上方，和门抢同一块位置；
-  // 而且它写的信息和悬停时的名牌完全重复 —— 一件既挡东西又不添信息的装饰。
 }
 function bookProps(g, x, y, w, d, jet){
   var fy = y + d + jet;
@@ -1051,11 +848,8 @@ function homeProps(g, x, y, w, d){
   g.appendChild(el("ellipse", {cx:lp[0], cy:lp[1], rx:TW*0.30, ry:TH*0.34, fill:"url(#glow)"}));
 }
 
-/* 公告板：两根柱子 + 一块板 + 一片平顶。触发三次解锁的就是它。
-
-   顶做成平的而不是坡的：七栋里已经有六顶是坡的，公告板再坡一顶，它就又变回
-   "小一号的房子"，而它其实是全场唯一一件家具。平顶还有个实际好处 —— 它把
-   板整个让出来，板才是这栋唯一需要看清的东西。 */
+/* 公告板由两根柱子、板面和平顶组成，触发三次后解锁。
+   平顶露出板面，并使其外形区别于房屋。 */
 function boardKiosk(g, x, y, w, d, h, roof){
   var by = y + d*0.55;
   rectY(g, by, x + 0.06, 0, x + 0.12, h, shade(C.beam,-0.12), 1.2);
@@ -1073,10 +867,8 @@ function boardKiosk(g, x, y, w, d, h, roof){
     faceTop(g, x - ox + 0.04, y - oy + 0.04, w + 2*ox - 0.08, d + 2*oy - 0.08, h + 0.13, C.roofSnow, 0, 0.95);
 }
 
-/* 长在墙面上的一圈点：给个世界半径，返回贴在 y=yf 这面墙上的正圆的世界点。
-   不能直接画 SVG 的 circle —— 墙面两个方向投影到屏幕是 (27,13.5) 和 (0,−26)，
-   不等长也不正交，墙上的圆投出来一定是斜椭圆（长轴沿墙的纵向往下压、短轴挑起来）。
-   交给 P() 逐点投影椭圆自己就对了，不用手写 rx/ry/rotate。n 调到 4 会得到菱形。 */
+/* 墙面圆按世界坐标采点后交给 P() 投影，得到正确的斜椭圆。
+   直接画 SVG circle 无法反映墙面两个不等长、非正交投影轴；n=4 得到菱形。 */
 function wallRing(yf, cx, cz, r, n){
   var L = [];
   for (var i = 0; i < n; i++){ var a = i / n * Math.PI * 2;
@@ -1088,8 +880,7 @@ function wallRing(yf, cx, cz, r, n){
 function tower(g, x, y, w, d, h, roof){
   rectX(g, x+w, y, 0, y+d, h, shade(C.stone,-0.20), 1.6);
   rectY(g, y+d, x, 0, x+w, h, shade(C.stone,-0.06), 1.6);
-  /* 勒脚 + 两道砌缝。这三笔是钟楼唯一能说明"它是石头砌的"的东西 ——
-     正面 95×206 像素里原本只有一条 12 像素宽的窗列，剩下的全是平色。 */
+  /* 勒脚与砌缝表现钟楼石材。 */
   rectX(g, x+w+0.006, y, 0, y+d, 0.30, shade(C.stone,-0.30), 1.2);
   rectY(g, y+d+0.006, x, 0, x+w, 0.30, shade(C.stone,-0.20), 1.2);
   [1.32, 2.46].forEach(function(cz){
@@ -1100,17 +891,11 @@ function tower(g, x, y, w, d, h, roof){
   // 窄窗，一列三扇。要正好停在招牌下沿（h−0.50）以内
   for (var i = 0; i < 3; i++)
     pane(g, y+d+0.008, x + w*0.40, 0.50 + i*0.84, x + w*0.40 + 0.20, 0.94 + i*0.84, false, 1.1);
-  // 钟面：金黄色，和暖窗同一族 —— 它亮着，楼才是"活的"。
-  // 位置必须在 h 以下：h 以上是尖顶的体内，画在那儿会被尖顶盖掉，
-  // 只剩边上露出一个月牙，看着像贴纸没贴正。
-/* 形状必须走 `wallRing()`，不能画正圆 —— 正圆是"正面朝向观众"的形状，而全镇每块面
-   都是斜的，只有这只钟是正的，于是它读起来不在墙上、是浮在墙前面。斜椭圆只是把形状
-   交还给投影：长轴顺着墙往下压的方向，一眼就知道这面墙朝右下走。针本来就躺在墙面内
-   （分针沿世界 +z、时针沿世界 +x），所以这一改只动形状、不动针。 */
+  // 金色钟面放在 h 以下，避免被尖顶遮挡。
+/* 钟面轮廓使用 wallRing() 投影，与墙面方向一致；指针继续沿世界 +z / +x。 */
   var cau = x + w*0.5, ccz = h - 0.50, cR = 0.40;
   poly(g, wallRing(y + d, cau, ccz, cR, 40), "#F3E4C0", 1.4);
-  // 金圈得手写 polygon：poly() 的描边永远是 C.line，颜色没得选（全文件只有
-  // 这一处需要别的描边色），所以这一条不能走 poly()。
+  // 金圈单独创建 polygon；poly() 的描边固定为 C.line。
   g.appendChild(el("polygon", {points: pts(wallRing(y + d, cau, ccz, cR, 40)),
     fill:"none", stroke:C.winLit, "stroke-width":"1.0", "stroke-linejoin":"round"}));
   var cp = P(cau, y + d, ccz);
@@ -1120,10 +905,7 @@ function tower(g, x, y, w, d, h, roof){
     stroke:C.line, "stroke-width":"1.4"}));
   g.appendChild(el("line", {x1:cp[0], y1:cp[1], x2:hh[0].toFixed(1), y2:hh[1].toFixed(1),
     stroke:C.line, "stroke-width":"1.4"}));
-/* 尖顶：底边从墙头收进来一圈，四条棱交于一点。整面刷白不留瓦色 —— 两片坡面按雪的
-   明暗来分（迎光面纯白、背光面压暗 0.24），因为这两片现在是同一层雪的两面。"沿坡面
-   下缘压一条雪带"那套在这儿取消了：底面已经全是雪，带子只会白上叠白、在棱上留一道
-   看不见的接缝。钟楼靠体量（全镇最高）和这圈 1.6 的深色描边从白屋顶里站出来。 */
+/* 尖顶从墙头内收，四棱交于一点。全顶覆雪，背光面加深 0.24，保留 1.6 深色描边。 */
   var ix = x + w*0.04, iy = y + d*0.04, iw = w*0.92;
   var apex = P(ix + iw/2, iy + iw/2, h + Math.max(w, d) * 1.25);
   var as = apex[0].toFixed(1) + "," + apex[1].toFixed(1);
@@ -1157,9 +939,7 @@ function shade(hex, amt){
 function tree(x, y){
   var g = el("g", {});
   var sc = J(0.85, 1.15), th = 0.5*sc, r = 0.42*sc;
-  /* 树的接触阴影比树冠小（0.24 对树冠的 0.30）。树冠那么大一块，
-     底下压一片同样大的蓝，读出来是"雪地上有一摊"，不是"树站在这里"；
-     收到树冠的三分之二，它才回到"接触"这件事上。 */
+  /* 树的接触阴影半径 0.24，小于树冠 0.30，避免形成大块蓝斑。 */
   if (!off("shadow")){
     var tp = P(x, y, 0);
     g.appendChild(el("ellipse", {cx:tp[0].toFixed(1), cy:tp[1].toFixed(1),
@@ -1181,20 +961,14 @@ function ground(){
   var g = el("g", {});
   var N = 11.4, cx = 5.7, cy = 5.7;
 
-/* 岛的轮廓：绕着中心撒一圈点，逐点独立抖动。方板子读起来像水泥台，锯齿边读起来像
-   一块雪地 —— 这一步决定整个画面的气质。抖动幅度 0.88~1.07 是试出来的：再小看不出
-   锯齿，再大就碎成花瓣。曾试过三个低频谐波做"平滑起伏"，几何上更干净，但岛变成一个
-   光溜溜的鸭蛋 —— 那不是雪地，是一枚硬币；凹角交给下面那步凸包。 */
+/* 岛轮廓逐点抖动 0.88~1.07，再取凸包保留不规则雪地边缘。 */
   var OUT = [], n = 40;
   for (var i = 0; i < n; i++){
     var a = i / n * 6.2832, r = 6.35 * (0.88 + rnd() * 0.19);
     OUT.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
   }
-  /* 撒完点取凸包。这一步不是美化，是修一个几何 bug：
-     逐点独立抖动会在轮廓上造出凹角（reflex）。下面那步"把轮廓竖直下移一个
-     厚度"挤出的侧面带，在凹角处会有一块落在凹口里面 —— 而顶面盖不住凹口
-     （凹口本来就不在顶面里），于是雪面上凭空多出一片灰楔子，看着就是一道
-     莫名其妙的阴影。取凸包把所有凹角抹掉，锯齿感一点没少。 */
+  /* 对抖动后的轮廓取凸包，消除凹角。否则向下挤出的侧面带
+     会伸入顶面无法覆盖的凹口，在雪面上露出灰色楔形。 */
   OUT = hull(OUT);
   // 屏幕投影包围盒，给投影和裁切用
   var xs = OUT.map(function(p){ return P(p[0], p[1], 0)[0]; });
@@ -1211,9 +985,7 @@ function ground(){
   var t = 0.62;
   g.appendChild(el("polygon", {points: pts(OUT.map(function(p){ return [p[0], p[1], -t]; })),
     fill:C.groundSide, stroke:C.line, "stroke-width":"1.7", "stroke-linejoin":"round"}));
-  // 命中区跟着每一段真实侧壁走：只覆盖顶面与下层之间的灰色厚度，
-  // 不再用屏幕坐标硬塞一块前方矩形。建筑后面的边会被建筑自身盖住，
-  // 露出来的外沿就能直接双击。
+  // 命中区沿真实侧壁逐段绘制，只覆盖顶面与下层之间的厚度。
   var hitG = el("g", {class:"mystery-hit-group", "pointer-events":"all"});
   for (var hi = 0; hi < OUT.length; hi++){
     var ha = OUT[hi], hb = OUT[(hi + 1) % OUT.length];
@@ -1236,15 +1008,10 @@ function ground(){
       fill:"none", stroke:"#8EE7FF", "stroke-width":"1.2", opacity:".48"}));
   }
 
-/* 这里原本画着路。删了 —— 按这一页的标准（删掉信息不少的就是装饰），
-   路不承载任何信息：没有一扇门开向它，它也不通向任何地方。
-   从这台相机看（+x/+y），镇子内部的地面本来就被屋顶压住，能露出来的只有镇前那块空地，
-   而街只存在那儿就不再是街，只是一块灰斑；那块空地也已经给前排的树占住了。
-   地面现在靠三样交代：接触阴影、雪堆、窗口洒下来的暖光。 */
+/* 地面不画道路；通过接触阴影、雪堆和窗口暖光表现层次。
+   此视角下镇内地面被屋顶遮挡，前方空地留给树木。 */
 
-/* 树和雪堆的排除框里写着"让开主路/让开广场"（tx 5.1~7.2 之类）—— 那是给旧版路矩形
-   让位的，路删了以后那些框就是纯粹在挖空构图。要再加路，先看这三条排除框，
-   它们会告诉你哪块地是空的。 */
+/* 树和雪堆的排除框保留镇内空地；重新布置道路时需同步检查这些区域。 */
   // 雪堆
   for (var i = 0; i < 30; i++){
     var sx = J(0.6, 10.8), sy = J(0.6, 10.8);
@@ -1258,63 +1025,47 @@ function ground(){
   return g;
 }
 
-/* 柴犬 —— 一张屏幕空间的画，在镇上自己溜达。造型、骨架、轮廓、步态逐字来自
-   `proto/dog-2d.html`（改狗要改样张页再搬过来，两份几何一旦分家就会改两处、
-   而漏掉的那处不报错）。不过 `P()` 是因为 22 像素上要读出"这是只狗"靠的是侧面剪影，
-   等距投影下的真 3D 狗在这个尺寸是一团糊；代价是转视角时狗身不跟着转。
-   不许用 circle：`__probe.state().trees` 数的是全场景每一个 circle。 */
+/* 狗使用屏幕空间侧面剪影，转视角时身体不旋转。
+   dogFlat() 同时供头像和 boss 使用；避免添加 circle，以免影响 trees 探针计数。 */
 
 var FUR = "#E8A44C", CREAM = "#F7EEDD", INK = "#2A2A2E", BELT = "#C4503F", BRASS = "#E8C15E";
-var DLEN = 0.951;   /* ← 本轮几何改了，跑完探针要改这个数 */   // 实测（含描边、含影子外沿）鼻尖到尾尖；动了几何就重测，别估。
+var DLEN = 0.951;   /* 鼻尖到尾尖，含描边、含影子外沿 —— 动了几何就重测，别估。 */
                     // 探针：见 _logs/README 或 cdp-console.py 里那条 getBoundingClientRect
                     // 的 IIFE —— 不能用 getBBox，它不含自身的 transform 和描边。
 
 var PAWY = 0.045;                          // 站住时爪底的高度
 var GAIT_A = 0.070, GAIT_LIFT = 0.052;     // 步幅 / 抬脚高度
-/* 远侧的脚抬起来（FARDY > 0）—— 腿的顶头埋在身子里，所以"往上挪"就是"变短"。
-   FARDY 必须大于 GAIT_LIFT（0.052），这是数上的硬要求：远爪落地时在 PAWY+FARDY，
-   近爪摆动相最高到 PAWY+GAIT_LIFT，小了就反转，两条腿谁前谁后读不出来。现取 0.070。
-   前后两条远腿一起抬 —— 等距投影里深度相同，本就该同高。往上抬对、往下压错。
-   FARDX 是在站姿下定的，量几何要用它实际被画出来的那个姿势。 */
+/* 远爪高度 FARDY=0.070 必须大于 GAIT_LIFT=0.052，保持远近腿层次。
+   前后远腿同高；FARDX 的几何测量以站姿为准。 */
 var FARDY = 0.070;
 /* 远侧腿相对近侧腿横向让开的量。整套几何（踝的收细、爪的外扩）一模一样，
    只是整条腿平移这么多 —— "另一侧的腿"因此不再是自己一套形状。 */
 var FARDX = 0.090;
-/* 远腿那两个贴身的锚点抬到这个高度：平移之后它们落到腹线以下了，
-   不抬就会从肚子底下露出一小截。0.470 在腹线最高点（bellyR 0.404）之上、
-   背线（≈0.62）之下，两边都安全。 */
+/* 远腿上锚点提高至 FAR_TOP=0.470，位于腹线最高点 .404 与背线约 .62 之间。 */
 var FAR_TOP = 0.470;
 
 /* 骨架：不随步态动的点。名字即部位，改的时候不用数下标。
    描边顺序就是这份字典的阅读顺序，不是几何顺序 —— 见 silhouette()。 */
 var SK = {
-  /* 头这一组是绕鬐甲 (0.186,0.620) 均匀放大 1.18 得到的，不是逐个调的。
-     你上一轮说"身体相对头部肥大"—— 头和身子都在，所以是比例问题，不是
-     谁的绝对值问题。均匀缩放不动形状，只动大小，改比例就该这么改。
-     顺带把耳尖从 0.925 压到 0.884：放大之后耳朵成了两根长尖，比整张脸
-     还高，那正是"鹿"的另一半来源（鹿的耳朵就是大而立的）。 */
+  /* 头部绕鬐甲 (0.186,0.620) 均匀放大 1.18，保持轮廓比例。
+     耳尖由 0.925 降到 0.884，避免放大后耳部过长。 */
   nose:[0.593,0.686], muzTop:[0.552,0.704], stop:[0.519,0.722],
   brow:[0.464,0.764], crown:[0.423,0.805], earF:[0.414,0.791],
   earTip:[0.379,0.911], earB:[0.333,0.782], skull:[0.308,0.755],
   neckTop:[0.248,0.704],
-  /* 背线故意不平：鬐甲抬起来、腰微塌、臀落下去。
-     原来是 0.620→0.612→0.602→0.592，一条几乎直的缓线 —— 那是"水牛"读法，
-     不是"矫健"。四点在 0.378 的跨度里只差 0.028，等于没动。 */
+  /* 背线抬鬐甲、收腰并降低臀部，避免躯干成为平直长条。 */
   with:[0.186,0.630], back1:[0.086,0.626], back2:[-0.038,0.620],
   croup:[-0.192,0.594], rumpTop:[-0.286,0.542], rumpBack:[-0.320,0.452],
   hipB:[-0.312,0.396], hipB2:[-0.308,0.300],
-  /* 收腰：前胸照旧深（bellyF 0.322 没动），肚子往后抬起来 0.030。
-     前腿长度一点没变（不然又变成鹿的长腿），只是腹线有了个斜坡。 */
+  /* 腹线向后抬高 0.030，保持 bellyF=0.322 和前腿长度。 */
   bellyR:[-0.100,0.404], bellyM:[0.020,0.372], bellyF:[0.148,0.368],
   shB:[0.152,0.240], elbow:[0.318,0.322], chest:[0.352,0.404],
   chestUp:[0.354,0.502], throat:[0.368,0.584], jaw:[0.416,0.624],
   chin:[0.476,0.617], muzBot:[0.519,0.630], noseBot:[0.582,0.647]
 };
 
-/* 一条腿 = 三段：下行背侧 → 脚 → 上行前侧。上段是固定骨架点、下段由落脚点 (fx,fy)
-   算，两段接点与骨架点共线，否则轮廓上会出现一个台阶。脚是圆的 —— 三个点里有两点
-   同高的话底面成直线、两角成直角，加上直上直下的腿就是一只蹄子（"像鹿"的根子）。
-   爪的侧面：踝细 → 外扩 → 前缘圆 → 后跟小凸。 */
+/* 腿轮廓依次连接背侧、脚和前侧；接点与骨架点共线，避免台阶。
+   爪部采用细踝、外扩脚掌和圆趾，避免形成方蹄。 */
 var PAW_F = [[-0.030, 0.064], [-0.042, 0.034], [-0.038, 0.012], [-0.016, 0.002],
              [ 0.020, 0.002], [ 0.042, 0.012], [ 0.050, 0.036], [ 0.040, 0.070]];
 var PAW_R = [[-0.027, 0.062], [-0.038, 0.032], [-0.034, 0.012], [-0.014, 0.002],
@@ -1328,11 +1079,8 @@ function pawOf(P, fx, fy){
 /* dx 把整条腿连同贴在身子上的那两个锚点一起平移。近腿 dx=0；
    远腿给 ±FARDX —— 于是远腿是近腿的同一副形状，只是整体错开。 */
 
-/*  KT：上段那两个贴身锚点跟着脚走的比例。腿是绕肩摆的柱子，宽度不该随步态变，
-    所以上锚点必须跟着脚走 —— 钉死在身上会让踝的背缘折回来，最窄那帧腿里只剩
-    0.2 屏幕像素的毛色。两个门槛是解出来的不是试出来的：
-    背缘不折 KT ≥ (0.152−0.186+0.070)/0.070 = 0.514，前缘不折 ≥ 0.857，取 0.86。
-    down[0]（bellyF / hipB）不跟着走 —— 它们是腹线和臀线的端点，一动奶白那块边界就得动。 */
+/* KT=0.86 使腿上锚点随脚移动，避免踝部背缘或前缘折返。
+   背缘要求 KT≥0.514，前缘≥0.857；腹线/臀线端点 down[0] 保持固定。 */
 var KT = 0.86;
 var HOME_F = 0.214, HOME_R = -0.250;   // 前后腿的家位 x（见 pose 里的 foot()）
 
@@ -1359,11 +1107,8 @@ function cat(a, b){ return a.concat(b); }
    29..31 belly（bellyR / bellyM / bellyF）/ 32..44 近前腿 / 45..52 front（elbow → noseBot）。
    改拼接顺序就得改这里。`pLine` 靠它把近后腿那一段空出来不描。 */
 var LEG_A = 16, LEG_B = 28;
-/* 整只狗的一条闭合轮廓，按描边顺序拼出来。
-   `brot` —— 身体那三段的加权旋转（头/胸/腹/背/臀，各自 w 不同，见 BW）。
-   `legrot` —— 后腿整条转满。前腿一条都不转：它整个 w = 0，转了反而错。
-两者必须分开传：后腿下半段的那些点是脚相对坐标（`fx±…, fy±…`），
-     按部位根本认不出权重，只能整条跟着臀走。 */
+/* 闭合轮廓按描边顺序拼接。brot 对身体按部位加权旋转；
+   legrot 对后腿整条旋转，两者分开传入，前腿保持不转。 */
 function silhouette(rf, ff, brot, legrot, LF, LR){
   brot = brot || function(p){ return p; };
   legrot = legrot || function(p){ return p; };
@@ -1388,43 +1133,29 @@ function silhouette(rf, ff, brot, legrot, LF, LR){
 }
 /* 一条腿的闭合多边形：下行背侧 → 脚 → 上行前侧。首尾两点就是贴在身上的锚点。 */
 function legPts(L){ return L.down.concat(L.paw, L.up); }
-/* 远腿：形状照抄近腿（构造函数里给 dx），再把首尾两个锚点抬进肚子里。
-   以前这里是一截自造的方柱子（顶头固定 0.420），顶头是平的、踝不收、爪还缩了
-   0.88 倍 —— 和近腿不是一副形状，所以"看着怪"。 */
-/* 入参是已经拼好的点列（`legPts(L)`）。首尾两点换成新数组再改 y ——
-   直接改会写回 `L.down[0]` / `L.up[末尾]` 那两个被近腿共用着的点。
-对后腿，这一步必须在旋转之前做：钉子用的是局部坐标的 FAR_TOP，
-     转完再钉等于钉错了地方。 */
+/* 远腿复用近腿形状，整体平移后将首尾锚点抬入躯干。 */
+/* 复制首尾点后调整高度，避免改到近腿共享数组；后腿需在旋转前设置局部 FAR_TOP。 */
 function farLegPts(p){
   p = p.slice();
   p[0] = [p[0][0], FAR_TOP];
   p[p.length - 1] = [p[p.length - 1][0], FAR_TOP];
   return p;
 }
-/* 趴下用的钉子：把远腿的首尾两点钉到近腿变换后的两个端点上 —— 原理和 `farLegPts`
-   一样（把接缝藏进身子里），只是锚点跟着姿势走：站姿那个 `FAR_TOP` 是局部坐标里的
-   高度，趴下背线只剩 0.32 高，照钉 0.470 就从背上穿出去了。这两个锚点必须是 `rot()`
-   现造的新数组，直接赋值等于让远近两条腿共用一个端点，一侧改动会串到另一侧。 */
+/* 趴姿远腿端点贴合近腿变换后的端点；使用新数组，避免远近腿共享可变坐标。 */
 function pinFar(p, a0, a1){
   p = p.slice();
   p[0] = [a0[0], a0[1]];
   p[p.length - 1] = [a1[0], a1[1]];
   return p;
 }
-/* 一条腿绕它自己的贴身锚点转 ang —— 趴下的全部动作。
-   锚点不动，而锚点同时是身子轮廓上的点，所以腿根和肚子天然对齐。
-这里不做下沉补偿：gi 上那个 translate 已经把整只狗沉下去了，
-     腿要留在原地（摊平），所以局部坐标就该是"只转了、没沉"。 */
+/* 趴姿腿绕自身贴身锚点旋转，不做下沉补偿；整狗下沉由 gi 的 translate 处理。 */
 function lieLeg(L, ang){
   if (!ang) return L;
   var piv = L.down[0];
   function r(p){ return rot(p, ang, piv); }
   return { down: L.down.map(r), paw: L.paw.map(r), up: L.up.map(r) };
 }
-/* 把一条腿按 t 塌到 a→b 线段上 —— 趴下时后腿的去处。轮廓是闭合折线、后腿是
-   挂在上面的一块半岛，每条边都会被描边：站姿下"从爪子折回腹线"那条回程边落在
-   大腿外缘看不见，趴下时横穿臀部，就是 E 面板那条"刺"；塌成线段后它就变成
-   身体的后下缘本身。必须按 t 连续塌，两端取 hipB / bellyR（原地不动）。 */
+/* 按 t 将腿轮廓连续塌到 hipB→bellyR 弦上，避免趴姿回程边横穿臀部。 */
 function collapseLeg(L, t, a, b){
   if (!t) return L;
   var all = L.down.concat(L.paw, L.up), n = all.length, i, out = [], q;
@@ -1437,11 +1168,7 @@ function collapseLeg(L, t, a, b){
            paw:  out.slice(L.down.length, L.down.length + L.paw.length),
            up:   out.slice(L.down.length + L.paw.length) };
 }
-/* 趴下时后腿折成的形状：和前腿同一套 —— 拿站姿那条 rearLeg 绕自己的根（hipB）转，
-   用的就是前腿那个 lieLeg、前腿那个角度。形状、宽度、踝、爪全由构造函数给，
-   不手写点（手写过 13 个点，形状能调，但爪永远是缺的）。
-   在 pose() 里现算，它要用 la；两边按 ll 插值，ll=0 逐点等于站姿那条腿。
-   光转不够，描边还得在身子下缘收笔，否则折进去的半截会在毛色上斜划两道线、在腹下交叉。 */
+/* 趴姿后腿复用 rearLeg 和 lieLeg，按 ll 从站姿插值，并在身体下缘结束描边。 */
 /* 远侧那只耳朵：露在头后面一点，深一档。少了它，头就只有一个尖，像狐狸。
    要比近耳窄一点但别太窄 —— 太窄就只剩一条线，看不出是只耳朵。 */
 var FAR_EAR = [[0.368, 0.764], [0.308, 0.879], [0.271, 0.755]];
@@ -1450,9 +1177,7 @@ function pts2str(p){
   for (i = 0; i < p.length; i++) s.push(p[i][0].toFixed(3) + "," + p[i][1].toFixed(3));
   return s.join(" ");
 }
-/* 同一条点列，画成两端留口的开放路径：从 `p[b]` 一路绕到 `p[a]`，
-   中间 `a..b` 那一段不描（`a` 和 `b` 自己是两个端点，照画）。
-   只给轮廓描边用一次，见 `pLine` 那一段的说明。 */
+/* 开放描边从 p[b] 绕回 p[a]，跳过 a..b 中间区间，保留两端点。 */
 function ptsPathGap(p, a, b){
   var s = [], i;
   s.push("M" + p[b][0].toFixed(3) + " " + p[b][1].toFixed(3));
@@ -1460,28 +1185,16 @@ function ptsPathGap(p, a, b){
   for (i = 0; i <= a; i++) s.push("L" + p[i][0].toFixed(3) + " " + p[i][1].toFixed(3));
   return s.join("");
 }
-/* 卷尾：渐细到收尖的一段弧，不是个圆环。上一版半径几乎不变又扫了 246°，画出来是
-   个甜甜圈，尾巴像轮子挂在屁股上；现在扫 200°、宽度 0.115 收到 0.016、圆心抬到背上，
-   尾尖正落在背线上，读起来才是"卷"。圆心是倒推出来的 —— 让 t=0 那个端点落在臀的
-   轮廓里面，根部被身子压住看不出接缝（以前圆心偏后，根部整个戳在屁股外面）。 */
-/* 坐下：按部位加权的旋转，枢轴在前爪。便宜的原因是 `silhouette()` 那条闭合
-   轮廓上头和尾都挂在身体锚点上，所以只要把身体锚点按权重转、再把四只脚放回
-   地面，轮廓就自动闭合连着，不需要任何新的缝合逻辑。正角 = 后半身下沉。
-   后腿和尾巴转满 a，脚必须 `unrot()` 回局部再交给腿的构造函数，否则爪子会
-   离开地面；前腿不转 —— 它的落点本来就在世界坐标里，别再过一次 unrot。 */
+/* 卷尾扫角 200°，宽度由 0.115 收至 0.016；根部埋入臀线，尾尖落在背线上。 */
+/* 坐姿以站在地面的前爪为枢轴，身体按部位加权旋转。
+   后腿和尾巴转满角度，后脚先 unrot 回局部以保持落地；前腿不旋转。 */
 var SIT_ANG = 26 * DEG;      // 身体俯仰角，坐满时
 var SIT_RDX = 0.20;          // 后脚往前收多少（世界单位）——不往前收，后腿会被压成一截短柱
-/* 臀在坐下时整体往前挪多少。枢轴在前爪（杠杆 0.6，非它不可 —— 只有这么长的杠杆才
-   够把臀压到地上），代价是"点在枢轴上方 ⇒ 往后退"：rumpBack 从 −0.320 退到 −0.444，
-   整只狗被拉长 14%，读起来是"趴下"不是"坐下"。真狗坐下时臀是往下沉、不是往后滑，
-   所以把这个后退量补回去。它必须和旋转一起做（`rot` 之后再加），单独平移会把臀举离地面。 */
+/* 臀部平移在 rot 之后补偿旋转造成的后退，避免坐姿拉长身体。 */
 var SIT_TX = 0.13;
 var _tx = parseFloat(Q.get("tx")); if (isFinite(_tx)) SIT_TX = _tx;
-/* 身体俯仰：按部位加权的旋转，不是整块刚性转。枢轴取前爪是对的，但整块转会让肩
-   跟着转 26°，前腿的上锚点错位、轮廓在那个缺口上折回来。改成每个锚点按自己的
-   权重转 a*w：前腿和头 w=0，后腿和尾巴 w=1。权重只能按部位给、不能按坐标插值 ——
-   同一 x 上背线离枢轴比腹线远，同一个角背线位移大得多，躯干会被剪成一条腰带。
-   腹线的权重拎出来当常量，腹白那块多边形必须用同一组数，否则后缘少转 2°。 */
+/* 身体按部位赋旋转权重：前腿/头 0，后腿/尾巴 1。
+   不按坐标统一插值；腹白需与腹线共用权重，保持边缘贴合。 */
 var W_BELLY_M = 0.30, W_BELLY_R = 0.70;
 var BW = [[SK.nose,0],[SK.muzTop,0],[SK.stop,0],[SK.brow,0],[SK.crown,0],
           [SK.earF,0],[SK.earTip,0],[SK.earB,0],[SK.skull,0],[SK.neckTop,0],
@@ -1492,18 +1205,12 @@ var BW = [[SK.nose,0],[SK.muzTop,0],[SK.stop,0],[SK.brow,0],[SK.crown,0],
           [SK.back2,0.55],[SK.bellyR,W_BELLY_R],
           [SK.croup,1],
           [SK.rumpTop,1],[SK.rumpBack,1],[SK.hipB,1],[SK.hipB2,1]];
-/* 按同一个数组对象认点（认 SK 里的那些引用），不按坐标认 —— 坐标会撞。认不出来的返回 0，
-   腿构造函数里那些 `[SK.shB[0]+d, SK.shB[1]]` 是新数组、本来就该留在原地。参数是点
-   不是 x：传 `p[0]` 会谁都不认得、静默返回 0，只是那条线短了一截 ——
-   `collapseLeg` 末端写成 `bodyW(SK.bellyR[0])` 时，身下就留了 0.05 的台阶。 */
+/* bodyW 按 SK 数组引用识别部位，不能传 x 坐标；构造出的新点默认权重 0。 */
 function bodyW(p){
   for (var i = 0; i < BW.length; i++) if (BW[i][0] === p) return BW[i][1];
   return 0;
 }
-/* 腹白那块多边形的权重：按 x 插腹线自己的三个站点（bellyF 0 /
-   bellyM W_BELLY_M / bellyR W_BELLY_R），而不是给它另定一套 —— 白块就贴在
-   腹线上，两者用同一个 x→w 插值，任意 x 处才严丝合缝，不会一头扎出腹线外面。
-   （腹白的后缘 x=−0.118 比 bellyR 的 −0.100 还靠后，落在最后那一档常量上。） */
+/* 腹白按 bellyF / bellyM / bellyR 的同一 x→w 插值，后缘沿用末档常量。 */
 function bellyW(x){
   if (x >= SK.bellyF[0]) return 0;
   if (x >= SK.bellyM[0]) return W_BELLY_M * (SK.bellyF[0]-x) / (SK.bellyF[0]-SK.bellyM[0]);
@@ -1512,33 +1219,20 @@ function bellyW(x){
   return W_BELLY_R;
 }
 
-/* 坐下的时序：腿先折、屁股后落。两件事被同一个线性 `sit` 一起推的话，后脚往前收和
-   身体俯仰等速，中途那帧必然是"腿斜伸、屁股半落"—— 那是蹲不是坐（0.25 / 0.50 那两帧
-   看得最清楚）。现在各给一个指数：`pow(sit, ELEG)` 给腿、`pow(sit, EBOD)` 给身子，
-   <1 是先快后慢。两个都从 `?eleg=` / `?ebod=` 压。 */
-/* 扫过的档：1.0/1.0 中途在读"蹲"；0.55/1.6 和 0.45/2.2 矫枉过正 ——
-   身子到 sit=0.5 才转 6.5°，读起来是"屈着腿站"。0.55/1.0 那一档
-   0.40 与 0.50 两帧屁股已经沉下去、后腿折起来了，就是要的样子。
-   身子那条不额外加曲线：抬腿和落臀本来就是一件事的两面，分开调
-   容易调成"先折腿再突然塌下去"。 */
+/* 坐姿使用 pow(sit,ELEG) 驱动腿、pow(sit,EBOD) 驱动身体，支持 ?eleg= / ?ebod=。 */
+/* 默认 ELEG=0.55、EBOD=1.0，使腿先收拢而臀部持续下沉。 */
 var ELEG = 0.55, EBOD = 1.0;
 var _e1 = parseFloat(Q.get("eleg")); if (isFinite(_e1)) ELEG = _e1;
 var _e2 = parseFloat(Q.get("ebod")); if (isFinite(_e2)) EBOD = _e2;
 
-/* 趴下：整个身子沉到地上、四条腿从柱子摊成平铺。只有一个自由度 —— 爪子必须落地，
-   所以摆角 LIE_SW 定了，下沉量 Dl 就反解出来（Dl = 摆完后的爪高 − PAWY）。下沉挂在
-   `gi` 的 translate 上，脸眼鼻项圈尾巴全自动跟着沉；影子挂在 `g` 上，不动。
-   要单独处理的只有三处：前腿绕 bellyF 转不补偿；后腿另画 LIE_REAR（站姿是直柱、
-   趴下是折起来的一叠，同一副形状转不出另一种拓扑）；SK.elbow 补一份 LIE_WE。 */
+/* 趴姿由 LIE_SW 反解下沉量 Dl=旋转后爪高−PAWY，整体位移挂在 gi，影子不动。
+   前腿旋转、后腿折叠和肘点 LIE_WE 分别补偿。 */
 var LIE_SW = 75 * DEG;   // 前腿摊平的角度（绕 bellyF）
 var LIE_HW = 75 * DEG;   // 远后腿的摆角（近后腿已由 LIE_REAR 接管）
 var LIE_WE = 0.65;       // 肘跟着沉多少份 —— 让腋窝→肘→胸口这条线顺下来
 var LIE_EXTRA = 0.018;   // 爪落地之后身子再压一点：正好是"腹线贴地"的那个量
 var LIE_E = 1.0;         // 时间曲线（1 = 匀速）
-/* 趴下时后半身抬起来多少。这不是修饰，是后腿能不能看见的前提：身体平着沉下去时
-   臀线离地只剩 0.036（hipB 0.396、地面 0.368），折腿塞在那条缝里画什么都是一块板子。
-   真狗趴着时后半身是被折腿垫起来的 —— 臀比胸高，那条缝本来就该有一条腿那么厚。
-   `LIE_REAR` 那些点是按这个角度算好的，改这个数必须重算那一组。 */
+/* 趴姿后半身稍抬高以容纳折腿。修改角度时须重算 LIE_REAR 点列。 */
 var LIE_TILT = 8 * DEG;
 [[ "lsw", function(v){ LIE_SW = v * DEG; } ],
  [ "lhw", function(v){ LIE_HW = v * DEG; } ],
@@ -1554,11 +1248,8 @@ function rot(p, ang, piv){
   return [piv[0] + dx*c - dy*s, piv[1] + dx*s + dy*c];
 }
 function tailPts(wag, n){
-  /* 半径 0.150→0.080（螺线），带宽 0.086→0.020。
-     关键是带宽要远小于半径 —— 上一版半径 0.114、带宽 0.104，
-     两个数一个量级，中间那个洞就跟呼啦圈一样大。
-     圆心 (-0.170, 0.556) 落在背线（≈0.60）以下：下半圈被身子盖住，
-     露出来的只有上半个弧，读起来是"卷在背上"，不是"屁股上挂了个环"。 */
+  /* 卷尾半径 0.150→0.080、带宽 0.086→0.020。
+     圆心 (-0.170,0.556) 位于背线下方，下半圈被躯干遮挡。 */
   var cx = -0.170, cy = 0.556, L = [], R = [], i;
   n = n || 17;
   for (i = 0; i < n; i++){
@@ -1573,45 +1264,35 @@ function tailPts(wag, n){
   R.reverse();
   return L.concat(R);
 }
-/* 里白：胸一块、腹一块，中间隔着前腿。原先是一整块从胸口连到肚子，那样必须从前腿
-   上方跨过去，"前腿连到身子往上"就读成了白的；白柴的里白本来就是两块（外腿是红的）。
-   腹部那块前缘停在 x=0.148（正面那条前腿的背缘 SK.bellyF，不是远侧的），下缘贴腹线
-   走，后缘停在 x=-0.118（远后腿占 -0.222~-0.115，刚好错开）。 */
+/* 胸白与腹白分开，前腿保持橘色。腹白前缘 x=0.148，后缘 x=-0.118，与腿错开。 */
 var CREAM_BODY = [
   [ 0.148, 0.371], [ 0.020, 0.375], [-0.060, 0.395], [-0.118, 0.419],
   [-0.078, 0.458], [-0.020, 0.456], [ 0.060, 0.452], [ 0.148, 0.442]
 ];
-/* 胸前这块：仍旧从领子底下（约 y=0.55 被项圈压住）往下，只到 y=0.440。
-   它在 x=0.30~0.356 —— 在前腿（0.058~0.264）前面，所以不违反
-   "前腿往上全是橘的"。 */
+/* 胸白位于 x=0.30~0.356、y=0.440~0.55，上端被项圈遮挡。 */
 var CREAM_CHEST = [
   [ 0.352, 0.592], [ 0.356, 0.502], [ 0.352, 0.440],
   [ 0.314, 0.462], [ 0.302, 0.516], [ 0.296, 0.576]
 ];
-/* 白脸：只盖口鼻和下半张脸，上缘压在眼睛下面 —— 眼睛必须落在橘色上。
-   头在这里只有约 0.045 高的一条橘色带（轮廓线本身吃掉 0.021），所以这张脸
-   的上缘、眼睛的半径、和头的顶线是三个绑在一起的数，动一个要动另外两个。 */
+/* 白脸限于口鼻和下脸，眼睛保留在橘色带内。
+   白脸上缘、眼睛半径和头顶线需联动调整。 */
 var CREAM_FACE = [
   [ 0.588, 0.679], [ 0.547, 0.697], [ 0.515, 0.716], [ 0.490, 0.706],
   [ 0.473, 0.667], [ 0.432, 0.658], [ 0.395, 0.651],
   [ 0.414, 0.630], [ 0.469, 0.626], [ 0.519, 0.637], [ 0.561, 0.651],
   [ 0.582, 0.653]
 ];
-/* 鼻子要缩在口鼻里面。贴到轮廓上就会和描边连成一片，
-   整个口鼻变成一只黑喙 —— 上一版就是这样。 */
+/* 鼻子缩入口鼻轮廓内，避免与外描边连成黑块。 */
 var NOSE_PTS = [[0.568,0.681],[0.582,0.674],[0.586,0.660],[0.577,0.651],
                 [0.565,0.656],[0.561,0.672]];
 
-/* 嘴。镇里那只狗没有这一笔、也不许有 —— 它的口鼻本来就是一整条轮廓线（SK 里
-   noseBot/muzBot/chin 那段），凭空加一张嘴等于改一个定稿的造型。所以它只有
-   `dogFlat(L,{mouth:1})` 才建，镇上那份的 DOM 一个节点没多。两条二次曲线，上唇钉死、
-   下唇随 open 往下鼓，open=0 时完全重合（既是闭着嘴也是张嘴的零时刻）。 */
+/* 仅 mouth:1 时创建嘴，镇上默认无嘴。上下唇为两条二次曲线，
+   上唇固定、下唇随 open 下移，open=0 时完全重合。 */
 var MOUTH_A = [0.556, 0.664],    // 唇线前点（鼻子后下方）
     MOUTH_B = [0.484, 0.641],    // 唇线后点（下巴前）
     MOUTH_C = [0.520, 0.658],    // 上唇控制点
     MOUTH_OPEN = 0.050;          // 张到最大时下唇往下鼓多少
-/* `maxDy` 是可选的：不传就是 `MOUTH_OPEN`（面板头像和镇上那条线的既有行为一个字不变）。
-   漫画第 5 格要"笑"得比说话明显，传一个更大的值进来 —— 但别去改 `MOUTH_OPEN` 本身。 */
+/* maxDy 默认 MOUTH_OPEN；漫画笑脸单独传入更大值，不影响头像默认张口量。 */
 function mouthD(open, maxDy){
   var dy = (maxDy == null ? MOUTH_OPEN : maxDy) * (open > 1 ? 1 : (open < 0 ? 0 : open));
   return "M" + MOUTH_A[0] + " " + MOUTH_A[1] +
@@ -1634,13 +1315,8 @@ function dogFlat(L, opt){
                               fill:"url(#contact)"});
   g.appendChild(shadow);
 
-  /* 画序 = 遮挡序，也是"不拼接"的关键：
-       远腿 → 尾巴 → 身子填色 → 奶白 → 轮廓描边 → 脸 → 项圈
-     轮廓描到最后一层，内部那些色块的边永远被它压住，不会各描各的。 */
-  /* 远腿不描边。描了的话，四条腿的粗线在肚子下面挤成一片黑 —— 试过
-     （dog22），腿是分开了，可整个下肢变成一坨。改成深一档的纯色块：它是
-     "背面"，本来就不该有和近侧一样硬的边。形状本身和近腿完全一样
-     （见 legPts），只是颜色深、没有描边。 */
+  /* 绘制顺序：远腿→尾巴→身体填色→里白→外轮廓→脸→项圈，外轮廓覆盖内部色块边。 */
+  /* 远腿复用近腿几何，使用深色填充且不描边，避免四腿描边在腹下挤成黑块。 */
   var pFarF = el("polygon", {points:"", fill:shade(FUR,-0.24), stroke:"none"});
   var pFarR = el("polygon", {points:"", fill:shade(FUR,-0.24), stroke:"none"});
   gi.appendChild(pFarF); gi.appendChild(pFarR);
@@ -1656,28 +1332,21 @@ function dogFlat(L, opt){
 
   var pBody = el("polygon", {points:"", fill:FUR, stroke:"none"});
   gi.appendChild(pBody);
-  /* 腹白要每帧重算：它横跨腰，一头在 w=0 的胸口、一头在 w=0.70 的肚子，
-     非得跟着腹线一起弯不可（见 pose 里的 bellyW）。
-     胸白和脸白反过来 —— 它们整个落在 w=0 那一侧，一次都不用动。 */
+  /* 腹白跨越不同旋转权重，需随腹线每帧重算；胸白和脸白处于 w=0 区域。 */
   var pCreamBody = el("polygon", {points:pts2str(CREAM_BODY), fill:CREAM, stroke:"none"});
   gi.appendChild(pCreamBody);
   gi.appendChild(el("polygon", {points:pts2str(CREAM_CHEST), fill:CREAM, stroke:"none"}));
   var pCreamFace = el("polygon", {points:pts2str(CREAM_FACE), fill:CREAM, stroke:"none"});
   gi.appendChild(pCreamFace);
 
-  /* 轮廓描边。是路径不是多边形 —— 近后腿那一段（下标 `LEG_A..LEG_B`）
-     要空出来不描，多边形做不到"断开"。为什么必须断开见 `pose()` 里
-     `pLine.setAttribute("d", ...)` 那一段。 */
+  /* 外轮廓使用开放路径，跳过近后腿 LEG_A..LEG_B 区间，避免趴姿重复描边。 */
   var pLine = el("path", {d:"", fill:"none", stroke:C.line,
                           "stroke-width":SW, "stroke-linejoin":"round",
                           "stroke-linecap":"round"});
   gi.appendChild(pLine);
 
-/* 趴下时那条折起来的后腿：自己一层，压在身子上面（见 pose() 里的 LP_t）。
-   分两个元素是因为描边和填色要的形状不一样：`pLieLeg` 是闭合多边形，只填色
-   （闭合边不描，不会多出线）；`pLieLine` 是开放折线，只描边（两端都落在身子的
-   轮廓上，毛色里不留线头）。必须排在 `pLine` 之后，才能盖掉那段腹线。站姿下
-   两层和 `pLine` 逐点重合，多画一层看不出差别。 */
+/* 趴姿后腿单独置于 pLine 上方：pLieLeg 闭合填色，pLieLine 开放描边。
+   两端落在躯干轮廓上；站姿与原轮廓重合。 */
   var pLieLeg = el("polygon", {points:"", fill:FUR, stroke:"none"});
   gi.appendChild(pLieLeg);
   var pLieLine = el("polyline", {points:"", fill:"none", stroke:C.line,
@@ -1685,8 +1354,7 @@ function dogFlat(L, opt){
                                  "stroke-linecap":"round"});
   gi.appendChild(pLieLine);
 
-  /* 脸。不许用 <circle> —— 那会污染 town.html 里
-     __probe.state().trees 的计数（它数的是全场景每一个 circle）。 */
+  /* 脸部使用 ellipse，避免污染 trees 对全场 circle 的计数。 */
   var eye  = el("ellipse", {cx:0.464, cy:0.704, rx:0.030, ry:0.031, fill:INK});
   var nose = el("polygon", {points:pts2str(NOSE_PTS), fill:INK, stroke:"none"});
   gi.appendChild(eye); gi.appendChild(nose);
@@ -1694,9 +1362,7 @@ function dogFlat(L, opt){
      SW 0.033 是照着"一整只狗的外形"定的，用在一条 0.07 长的唇线上就成了一条黑杠。 */
   var mouth = null;
   if (wantMouth){
-    /* `class` 是给尺子用的：`_logs/_avcheck.py` 要能数出嘴有几个，
-       好让"孪生页里一个都没有"成为可核对的阴性对照。
-       （`.c-av path` 数不了 —— 轮廓和项圈也是 path。） */
+    /* 嘴节点保留独立 class，供 _logs/_avcheck.py 区分嘴与其他 path。 */
     mouth = el("path", {d:mouthD(0), class:"dog-mouth", fill:INK, stroke:INK,
                         "stroke-width":0.020, "stroke-linejoin":"round",
                         "stroke-linecap":"round"});
@@ -1716,15 +1382,10 @@ function dogFlat(L, opt){
     st = st || {};
     var ph = (st.ph || 0) * Math.PI * 2;
     var on = st.gait === false ? 0 : 1;
-    /* 趴下和坐下互斥：它们是两支不同的刚体变换，叠起来没有意义
-       （坐是"后半身绕前爪转"，趴是"整体沉 + 四腿摊平"）。谁给了 st.lie 就
-       走趴下那一支，坐下的角度/平移全部归零。 */
+    /* lie 与 sit 互斥；传入 st.lie 时清零坐姿旋转和平移。 */
     var lie = Math.max(0, Math.min(1, st.lie || 0));
     var ll = LIE_E === 1 ? lie : Math.pow(lie, LIE_E);
-/* "塌完"的进度：比 `ll` 先走完（0.3 就到 1）。远腿是"从站姿一路插值到那条贴身的线"，
-   插到一半就吊在肚子下面露出来（把远腿染绿看：ll=0.4 时肚子底下吊着两块，加上近腿
-   那两条正好是"后腿变成了三条"）。另外两处也跟着它走：剪影里那条腿塌到弦上
-   （`pLine` 要把那一段空出来不描）、折腿末点贴回身子下缘。 */
+/* 塌陷进度在 ll=0.3 时完成，提前隐藏远腿并使近后腿轮廓、折腿末点贴回身体下缘。 */
     var llf = ll / 0.3 < 1 ? ll / 0.3 : 1;
     var sit = lie ? 0 : Math.max(0, Math.min(1, st.sit || 0));
     /* 两条曲线：`sl` 驱动四条腿的折叠与收拢，`sb` 驱动身体的俯仰。
@@ -1733,44 +1394,32 @@ function dogFlat(L, opt){
     var sb = EBOD === 1 ? sit : Math.pow(sit, EBOD);
     /* 负角 = 后半身抬起（正角是坐下那个"后半身下沉"）。趴下走这一支。 */
     var a = SIT_ANG * sb - LIE_TILT * ll;
-    /* 趴下：腿摆平的角度，和由它反解出来的下沉量。顺序不能反 ——
-       `Dl` 的定义就是"摆完之后的爪高减去 PAWY"，所以必须先有角度。
-       角为 0 时 `rot` 返回原点 ⇒ `Dl` 自然为 0，不需要特判。 */
+    /* 先算摆角再反解 Dl；角度为 0 时下沉量自然为 0。 */
     var la = LIE_SW * ll, ha = LIE_HW * ll;
     var Dl = rot([HOME_F, PAWY], la, SK.bellyF)[1] - PAWY + LIE_EXTRA * ll;
     /* 走起来的过程里步态要一起收掉 —— 否则一只正在坐下/趴下的狗四条腿还在小跑。
        `on` 管"要不要走"，这两项管"坐下/趴下时走不走"，三者相乘。 */
     var g = on * (1 - sl) * (1 - ll);
     var bob = 0.012 * Math.cos(2*ph) * g;
-    /* 先算世界坐标里的落点，再反旋转回局部坐标 —— 转完才会正好踩在地上。
-       （旋转是刚体变换，局部坐标里"抬高一截"转完就不等于世界里"抬高一截"，
-       所以 FARDY 这个远腿的抬升也必须走世界坐标。） */
+    /* 先在世界坐标确定落脚点和 FARDY 抬升，再 unrot 回局部坐标，保证旋转后落地。 */
     function unrot(p){
       var c = Math.cos(-a), s = Math.sin(-a);
       var dx = p[0]-PIV[0], dy = p[1]-PIV[1];
       return [PIV[0] + dx*c - dy*s, PIV[1] + dx*s + dy*c];
     }
-    /* 对角步：右前与左后同相 —— 小跑（trot），不是同手同脚。
-       远侧那一对的家位各让开 FARDX=0.090 —— 这个量是近侧腿的描边定的：
-       远爪的前缘必须露在近腿背缘的外面，否则整条远腿被吃掉。
-       爪一加宽（0.084 → 0.092）这个数就得跟着加，0.078 时趾尖已经藏进去了。 */
+    /* 小跑采用对角步。远腿横向偏移 FARDX=0.090，使脚趾露出近腿轮廓。
+       修改爪宽时同步检查遮挡。 */
     function footW(hx, p, sitDx, lift){
       return [hx + GAIT_A*g*Math.cos(p) + sitDx*sl,
               PAWY + Math.max(0, -Math.sin(p)) * GAIT_LIFT * g + (lift || 0)];
     }
-/* 远侧后腿坐下时要缩到近侧后面去（TUCK）—— 不缩的话那条远腿会从肚子底下斜戳出一片
-   没描边的深色薄片，尖头朝下，读起来像刺。根子不是画错：`KT` 那个补偿量是按步态摆幅
-   ±GAIT_A=0.070 解出来的，而 SIT_RDX=0.20 是它的近三倍，整条腿被拉成一块横板 ——
-   站姿的拓扑表达不了坐姿。所以不修形，让它被挡住：FARDX/FARDY 随 sl 归零。 */
+/* 坐姿随 sl 将远后腿的 FARDX/FARDY 收至零，藏到近腿后方。
+   步态 KT 只适配 ±0.070 摆幅，不能直接用于 SIT_RDX=0.20 的大幅收腿。 */
     var tk = 1 - sl;
-    /* 前腿落点是世界坐标（eleg 那条链上它一个点都不转），
-       后腿落点是局部坐标 —— 后腿整条跟着臀转满 a，所以先算出世界落点、
-       再 `unrot` 回来，转完才正好踩在地上。 */
+    /* 前脚直接使用世界坐标；后脚先 unrot 为局部坐标，再随臀部旋转。 */
     var fn = footW(HOME_F,             ph,           0,       0),
         ff = footW(HOME_F - FARDX,     ph + Math.PI, 0,       FARDY);
-    /* 后脚：先在世界坐标里算出落点，减掉 tx，再反旋转回局部坐标。
-       减 tx 是因为下面 `rig` 会给整条后腿补上这个平移 —— 不先减掉的话，
-       爪会被平移带着往前跑（`sitDx` 就不再是它实际走的那段了）。 */
+    /* 后脚世界落点先减 tx 再 unrot，抵消 rig 后续对整腿追加的平移。 */
     var tx = SIT_TX * sb;
     function rfoot(hx, p, lift){
       var w = footW(hx, p, SIT_RDX, lift);
@@ -1778,14 +1427,10 @@ function dogFlat(L, opt){
     }
     var rn = rfoot(HOME_R,             ph + Math.PI, 0),
         rf = rfoot(HOME_R + FARDX*tk,  ph,           FARDY*tk);
-    /* 两个变换，别混：
-         `bw`  —— 按部位加权（头/胸 0、腰 0.3~0.62、臀 1），再按同一个 w 补 tx。
-         `rig` —— 整条转满 a 再加 tx，给后腿和尾巴：它们就是臀的一部分，没有中间态。
-       前腿和脸上那些件不经过任何变换 —— 它们全是 w=0，转了反而错。 */
+    /* bw 按部位权重旋转并补 tx；rig 对后腿和尾巴全角旋转再补 tx。
+       前腿与脸部的权重为 0，保持原位。 */
     function bw(p){ var w = bodyW(p); return bwAt(p, w); }
-    /* 趴下只补偿肘一个点 —— 其余身体锚点都该沉满，而"沉满"这件事是
-       gi 上那个 translate 干的，局部坐标一个字都不用动。
-       肘不补偿就会掉到腹线以下，在肩前戳一个向下的尖。 */
+    /* 趴姿整体由 gi 下沉，仅补偿肘点，避免其落到腹线以下。 */
     function bwAt(p, w){
       var q = a ? rot(p, a*w, PIV) : p;
       if (tx && w) q = [q[0] + tx*w, q[1]];
@@ -1793,87 +1438,52 @@ function dogFlat(L, opt){
       return q;
     }
     function rig(p){ var q = a ? rot(p, a, PIV) : p; return tx ? [q[0]+tx, q[1]] : q; }
-    /* 四条腿：趴下时全部绕各自的贴身锚点转（`lieLeg`），站/坐时原样。
-远腿的 `dx` 要在摆之前给（构造函数里给），摆的枢轴是它自己的
-         `down[0]`（已经含了 dx），这样两条腿各自绕各自的根，不会互相拽。 */
+    /* 趴姿四腿绕各自 down[0] 旋转；远腿 dx 必须先由构造函数写入锚点。 */
     var LF_n = lieLeg(frontLeg(fn[0], fn[1], 0), la),
         LF_f = lieLeg(frontLeg(ff[0], ff[1], -FARDX), la),
-/* 近后腿在剪影里塌平（和远腿一样）：那条折腿已经单开一层画了（见 pLieLeg / LP_t），
-   剪影再留一块半岛，两条腿的边会打架。两个塌陷端点必须是反旋过的最终位置 ——
-   `collapseLeg` 的端点是最终坐标，而腿的点还会被 `rig` 转一道，直接给最终坐标等于
-   转两遍（这才是上一版"原本身体的线还在表层"的真因）。`rig(unrot(p)) === p`。 */
-/* 近后腿：一串点同时喂给剪影和那一层（见下面 `pLieLeg`）。走 `lieLeg` + `collapseLeg`
-   那条老路时，那一层另走一条混合 —— 两条路算出两个形状，中途就成了"后腿变成了三条"。
-   现在只有一串数，任何一帧都只有一个形状。混合在局部坐标里做（起点是站姿那条腿、
-   终点是折好的那条），两边由 `rig` 一起转出去。 */
-        /* 终点那条腿和前腿走同一套：拿站姿的 `rearLeg` 绕自己的根
-           （`down[0]` = `hipB`）转 `la`，用的就是前腿那个 `lieLeg`、那个角度。
-           形状、宽度、踝、爪全是构造函数给的。 */
+/* 近后腿剪影塌平，折腿单独绘制。collapseLeg 端点先反旋转，
+   确保 rig(unrot(p))===p，避免最终坐标被旋转两次。 */
+/* 近后腿共用 LP 点列，局部坐标内从站姿插值到折腿，再统一经 rig 变换。 */
+        /* 折腿目标由 rearLeg 绕 hipB 旋转 la 得到，与前腿共用 lieLeg。 */
         LP_t = legPts(lieLeg(rearLeg(HOME_R, PAWY, 0), la)),
         LP = legPts(rearLeg(rn[0], rn[1], 0)).map(function(p, i){
           var q = LP_t[i];
           return [p[0] + (q[0]-p[0])*ll, p[1] + (q[1]-p[1])*ll];
         }),
         LPn = { down: LP.slice(0, 3), paw: LP.slice(3, 11), up: LP.slice(11) },
-/* 剪影里那条后腿塌到弦上（`hipB→bellyR`，局部坐标，出去由 `rig` 转正）。这样身子
-   自己保留下后缘一条完整的边，折腿那一层再压上去 —— 两层分得开靠的就是"身子有边、
-   腿压在它上面"。这一条也塌 `llf`（比那一层先缩完）：塌到一半的剪影腿始终落在那一层
-   的填色多边形里面（那个多边形把弦以上那块也圈进去了），快慢不一致也露不出来。 */
-        /* 末端点要用 `bellyR` 在腹线上那一个（带 `bodyW` 权重），不是
-           `rig(SK.bellyR)` —— 后者差 0.019，塌出来的线与腹线接不上，
-           会在身下留一个台阶。 */
+/* 剪影后腿按 llf 提前塌到 hipB→bellyR 弦上，折腿层覆盖其填色。 */
+        /* 末端使用带 bodyW 权重的 bellyR，保持与腹线连续。 */
         LPc = collapseLeg(LPn, llf, SK.hipB,
                           unrot(bwAt(SK.bellyR, bodyW(SK.bellyR)))),
         LR_n = LPc,
         /* 远后腿：塌到 `hipB→bellyR` 上，被身子的填色和近腿盖住 ——
            真狗趴着时远侧后腿本来就在后面看不见。 */
-/* 塌陷的两个端点必须用抬起之后的锚点：`LIE_TILT` 把臀线和腹线的后端都抬走了，照原来
-   的坐标塌，那条线会留在原地、从身子底下露出来。塌的进度用 `llf` 不用 `ll` —— 远腿要
-   比近腿先塌完（它插到一半就吊在肚子下面露出来，加上近腿那两条就是"后腿变成了三条"）。
-   0.3 走完全程。 */
+/* 塌陷端点使用 LIE_TILT 抬升后的锚点，进度 llf 在 ll=.3 时完成，提前隐藏远腿。 */
         LR_f = collapseLeg(lieLeg(rearLeg(rf[0], rf[1], FARDX*tk), ha), llf,
                            bwAt(SK.hipB, 1),
                            bwAt(SK.bellyR, bodyW(SK.bellyR)));
     var outPts = silhouette(rn, fn, bw, rig, LF_n, LR_n);
     pBody.setAttribute("points", pts2str(outPts));
-/* 描边跳过近后腿那一段（下标 LEG_A..LEG_B）。身子下缘在这一段没有自己的边：站姿下
-   那儿是真腿本身、`pLieLine` 会画出来；趴下时剪影那条腿整个塌到弦 hipB'→bellyR' 上，
-   这一段就成了一道横在毛色上、上下同色的杠。不描它就没了，填色照旧沿弦闭合。
-   两个端点仍照画。 */
+/* 外轮廓跳过 LEG_A..LEG_B，避免趴姿塌平腿在毛色内形成横线；填色仍沿弦闭合。 */
     pLine.setAttribute("d", ptsPathGap(outPts, LEG_A, LEG_B));
-/* 那条折腿：自己一整块，压在身子上面（`LP`，和剪影用的是同一个 `ll`）。填色是闭合
-   多边形 —— 连弦 `bellyR'→hipB'` 一起圈进去，所以弦以上那块（大腿压在身上）也是毛色；
-   描边是开放折线，闭合边不描，不然身侧会多出一道从髋直拉到腹线的直线。站姿下和
-   `pLine` 逐点重合看不出来，趴下时大腿顶那条横线就画在身侧，腿于是读得出来。 */
+/* 折腿层使用闭合填色和开放描边，覆盖弦上方的大腿区域而不描闭合弦。 */
     var liePts = legPts(LPn).map(rig);
-/* 折腿的末点 p12 要贴回剪影的下缘 —— 它是这条腿挂在身子上的那一点。剪影那条腿
-   往弦上塌、身子下缘先收上去，p12 还吊在下面，后缘和身子之间就裂开一道口子
-   （线端的圆头悬空、填色楔形露出来）。目标取剪影里那条腿的同一个点 `LPc.up[1]`，
-   只提不压 —— p11 本来就该在外面吊着。x 也要贴，只贴 y 会差 0.037 的横距。
-   位置要在填色 setAttribute 之前，之后改只动到描边。 */
+/* 折腿 p12 按 llf 向剪影的 rig(LPc.up[1]) 对齐，只提不压，同时校正 x/y。
+   调整必须早于填色 setAttribute。 */
     var j12 = rig(LPc.up[1]);
     if (liePts[12][1] < j12[1]){
       liePts[12][0] += (j12[0] - liePts[12][0]) * llf;
       liePts[12][1] += (j12[1] - liePts[12][1]) * llf;
     }
-/* 填色的收口边 p12→p0 要停在弦描边的外沿（往上半个线宽）：停高了把整条弦盖死、
-   读起来"腿和肚子连成一片"，停低了外侧半个线宽留在外面，就是"中间黑线"。
-   还要跟弦错开 1/4 个线宽 —— 两条填色边贴在一起时各自的抗锯齿各盖一半，交界处会
-   露出背景成一道发白的细线（弦已经不描了，这里只需盖住抗锯齿）。两个量都乘 llf。 */
+/* 填色收口沿弦法线重叠 SW*.25*llf，盖住抗锯齿接缝。 */
     var q0 = liePts[0], q1 = liePts[12];
     var ex = q1[0]-q0[0], ey = q1[1]-q0[1], el = Math.sqrt(ex*ex + ey*ey) || 1;
     var nx = -ey/el, ny = ex/el;                    // 弦的法线，指向身子那一侧
     var nK = SW * 0.25 * llf;
     pLieLeg.setAttribute("points", pts2str(liePts.concat(
       [[q1[0]+nx*nK, q1[1]+ny*nK], [q0[0]+nx*nK, q0[1]+ny*nK]])));
-/* 收口边只到 `p12` 就拐回髋，所以上缘离弦不能超过一个线宽：弦以上不算腿、上缘以下
-   才是腿。`p11` 压到弦下 0.036 时，x=−0.14 那一列中间会冒出一块背景色 —— 原先靠
-   两笔描边各半个线宽盖住，现在弦不描了，盖缝的只剩填色，判据只会更严，没有放松。 */
-/* 折腿的描边在身子下缘收笔。折起来之后这条腿的后半截整个跑到身子里面，照描就是在
-   毛色上斜着划一道线，两道这样的线在腹下交叉，就是"别扭的变成个刺往旁边钻"。
-   身子下缘那条线 `pLine` 本来就在画，收在这里正好接上。站姿下一个点都不裁，站着 /
-   走路 / 坐下逐像素不变。折线的权重必须和剪影里 `belly.map(brot)` 完全一致，
-   否则收笔处会差出一两个像素。 */
+/* 折腿上缘距弦不超过一个线宽，保持填色封闭并避免露出背景。 */
+/* 折腿描边在身体下缘收笔，权重与剪影腹线一致；站/走/坐姿不裁剪。 */
     var lowLine = [bwAt(SK.hipB, 1), bw(SK.bellyR), bw(SK.bellyM), bw(SK.bellyF)];
     function bodyLow(x){
       for (var li = 0; li < lowLine.length - 1; li++){
@@ -1883,10 +1493,7 @@ function dogFlat(L, opt){
           return la2[1] + (lb[1] - la2[1]) * lt;
         }
       }
-/* x 落在折线两头之外时必须把最近那一段延长出去，不能返回 −1e9 —— 那是"下缘在很深的
-   地方"，于是任何点都算在它上面 = 在身子里，和本意正好相反，而且是端点处一刀切。
-   代价：小跑六格里后脚往后摆的那三格 fx 到了 −0.320，比 hipB.x 还靠后，`p1`（飞节）
-   落到折线之外被判成"进身子了"，描边在那一段收笔，整条腿只剩剪影一笔。 */
+/* x 超出下缘折线时延长最近线段，避免用哨兵高度造成端点处突变。 */
       var ea = x < lowLine[0][0] ? lowLine[0] : lowLine[lowLine.length - 2],
           eb = x < lowLine[0][0] ? lowLine[1] : lowLine[lowLine.length - 1];
       var et = (x - ea[0]) / ((eb[0] - ea[0]) || 1e-9);
@@ -1910,23 +1517,13 @@ function dogFlat(L, opt){
     pLieLine.setAttribute("points", pts2str(lieDraw));
     pCreamBody.setAttribute("points", pts2str(CREAM_BODY.map(function(p){
       return bwAt(p, bellyW(p[0])); })));
-    /* 远前腿也不转（和近前腿一样整个 w=0）；远后腿先 farLegPts 再 rig ——
-       顺序反了就不对：首尾锚点要钉在局部坐标的 FAR_TOP 上，
-       旋转放到最后，才和改动前（由 group 统一转）逐点相同。 */
-    /* 远腿的钉子分两路：趴下钉到近腿的端点上（见 pinFar），其余钉 FAR_TOP。
-       远后腿在站/坐那一路还要再 `rig` —— 钉用的是局部坐标的 FAR_TOP，
-       所以必须在旋转之前钉。趴下那一路腿已经摆好了，不能再 rig。 */
+    /* 远前腿不随身体转；远后腿先 farLegPts 设置局部锚点，再 rig。 */
+    /* 趴姿远腿锚点贴近腿端点；站/坐姿锚到 FAR_TOP，后腿随后执行 rig。 */
     if (ll){
-      /* 远前腿这里原来只调 `pinFar`（把首尾两点钉到近腿上），中间那 11 个点
-         一动不动 —— 于是它成了"一条转过的腿，两头被拎到肩膀、爪子还吊在
-         老地方"，正是 dbg10 里那块绿斑。改成和远后腿同一套：先 `collapseLeg`
-         塌到近腿的首尾连线上，再钉。塌完是一条贴着肩胛的线，被近腿和身子
-         的填色整个盖住。 */
+      /* 远前腿整条按同一位移升入身体，再钉端点，保持脚与腿根的相对形状。 */
       pFarF.setAttribute("points",
         pts2str(legPts(collapseLeg(LF_f, llf, LF_n.down[0], LF_n.up[1]))));
-      /* 远后腿钉到 hipB / bellyR —— 后腿塌平之后，轮廓上那两个位置就是它的入口
-         和出口。形状本来就已被 collapseLeg 塌成一条线，所以这里画的是一条
-         压在身体后下缘上的线，不露头。 */
+      /* 远后腿塌到 hipB/bellyR 弦后隐藏于近腿和身体后。 */
       pFarR.setAttribute("points",
         pts2str(pinFar(legPts(LR_f), bwAt(SK.hipB, 1),
                        bwAt(SK.bellyR, bodyW(SK.bellyR)))));
@@ -1936,16 +1533,10 @@ function dogFlat(L, opt){
         pts2str(farLegPts(legPts(rearLeg(rf[0], rf[1], FARDX*tk))).map(rig)));
     }
     pTail.setAttribute("points", pts2str(tailPts(0.020*Math.sin(ph + 0.6)*on).map(rig)));
-    /* 影子挂在 g 上（不在 gi 里），所以不跟着转、也不跟着沉 ——
-       它本来就该平躺在地上。坐下去重心后移、趴下去身子拉长，
-       两种情况都得单独挪一下，否则狗像坐在影子前面 / 影子比狗短。 */
+    /* 影子挂在 g，不随 gi 旋转或下沉；坐/趴姿分别调整位置和长度。 */
     shadow.setAttribute("cx", (0.060 - 0.150*sb + 0.130*ll).toFixed(4));
     shadow.setAttribute("rx", (0.400 + 0.030*sb + 0.110*ll).toFixed(4));
-    /* gi 管两件事：走路起伏，和趴下的整体下沉。
-       下沉挂在这里的意义：脸/眼/鼻/项圈/铃铛/胸白/脸白/远耳/尾巴/轮廓
-       全部自动跟着走，局部坐标一个都不用改 —— 只有腿和肘需要补偿。
-       以前那个 `rotate(a)` 早就拆进 bw/rig/不转三路里了；早先还在 eye 的 cy 上
-       又加过一遍 bob，那是重复计数。 */
+    /* gi 统一承担步态起伏与趴姿下沉，使头脸、项圈和身体同步移动。 */
     gi.setAttribute("transform",
       "translate(0," + (bob - Dl).toFixed(4) + ")");
   }
@@ -1965,10 +1556,7 @@ function dogFlat(L, opt){
   };
 }
 
-/* 巡游路线。这条线不是画出来的 —— 两把尺子在 `_logs/dogroute.py`：① 逐段做线段-
-   外扩矩形相交（房子 footprint 外扩 0.62），必须零相交；② 沿路每 0.1 单位采点，
-   看脚下是不是地面色。之所以是"进过道再退回来"而不是绕镇一圈：相机在 +x/+y，成片
-   可见的只有前广场和右侧过道，左边那条过道只剩 0.08 宽的缝。 */
+/* 巡游路线由 _logs/dogroute.py 检查：不与外扩 .62 的建筑框相交，沿路狗脚保持在地面内。 */
 var ROUTE = [
   [3.4, 11.1], [7.6, 11.1], [9.8, 10.3], [10.6, 9.2], [11.0, 7.2],
   [11.0, 4.8], [10.4, 2.9], [9.5, 2.0],
@@ -1984,21 +1572,14 @@ for (var _i = 0; _i < ROUTE.length; _i++){
 
 var DOG_L     = 22;      // P 单位。尺寸的取舍见上面的说明。
 var DOG_SPEED = 1.15;    // 世界单位/秒。一圈 31.3 单位 ≈ 27 秒。
-/* 一个步态周期走多少世界单位 —— 这个数决定会不会打滑。
-   腿的摆动频率和前进速度对不上，看着就是在冰上滑。
-   0.83 个狗身长 / 周期：1.15 ÷ 0.605 ≈ 1.9 周期/秒，是小跑的节奏。
-   P 单位→世界单位是 30.2 = √((TW/2)²+(TH/2)²)，而这条路基本沿着世界 x 或 y
-   走（屏幕位移正好是 30.2 P 单位），所以"按世界单位算"和"按屏幕算"是一回事。 */
+/* 每周期位移匹配腿摆频率，避免打滑；目标约 .83 个狗身长/周期。 */
 var DOG_STRIDE = 0.83 * DOG_L / Math.hypot(TW/2, TH/2);
 var DOG_T0 = 0.10;    // 定格/降级时狗站的位置（绕一圈的 0~1）
 var DOG_PH0 = 0.25;   // 定格/降级时的步态相位（定格一帧跑动姿势）
 
 var DOG_ON = !off("dog") && (Q.get("no") || "").split(",").indexOf("dog") < 0;
 
-/* ?sit=0..1 —— 狗的坐姿量。只有这一个入口、没有任何自动触发：什么时候坐还没定，
-   别先塞一条"走到这儿就坐"。它一并进 FROZEN，否则狗会一边坐一边沿路线滑走。
-   `#sit=1` 同样管用，且双击只能用这种写法（ShellExecute 会吃掉问号后那一截）。
-   这块必须在 FROZEN 之前 —— var 只提升声明不提升赋值，写在后面读到的是 undefined。 */
+/* ?sit=0..1 固定坐姿并加入 FROZEN，不自动触发；#sit= 提供双击文件场景的参数入口。 */
 var _sitRaw = Q.get("sit");
 if (_sitRaw === null){
   var _sm = /(?:^|[#&])sit=([^&]*)/.exec(location.hash);
@@ -2009,10 +1590,7 @@ var dogSit = 0;
 if (SIT_ON){ var _sq = parseFloat(_sitRaw);
   dogSit = isFinite(_sq) ? Math.max(0, Math.min(1, _sq)) : 1; }
 
-/* ?lie=0..1 —— 狗的趴姿量。和 `?sit=` 同名同规矩（`#lie=` 也认，理由见上），
-   用来出一张可复现的趴姿图：`?w=1300&h=2400&lie=1&dog=0.10`（0.10 只是随手取的
-   窗口内一点，见下面 `REST_WIN` —— 趴下的地方现在是随机的，没有一个"标准点"了）。
-   平时的趴下不是靠这个参数，是靠下面那段自动行为；参数只负责定格。 */
+/* ?lie=0..1 或 #lie= 固定趴姿，与 sit 使用同一套定格规则。 */
 var _lieRaw = Q.get("lie");
 if (_lieRaw === null){
   var _lm = /(?:^|[#&])lie=([^&]*)/.exec(location.hash);
@@ -2025,14 +1603,8 @@ if (LIE_ON){ var _lq = parseFloat(_lieRaw);
 
 /* 定格模式：?w= / ?click= / ?hover= / ?sit= / ?lie= 都是"渲染完就截"的路子。
    给它们一个不动的狗，否则像素对比和 ?dbg=1 零洋红这两条验证手段全废。 */
-/* `?chat=1` 也算定格：出"面板打开着"的图时狗必须站着不动，
-   否则每张截图的狗各走各的，逐像素对比又废了。
-   `?ask=` 同理 —— 它自己也开面板，探针出图时狗不能还在溜达。 */
-/* `?w=&h=` 是"外面告诉它窗口多大"（被 iframe 挂上去时盒子是 0×0，它自己量不到），
-   这两件事本来不该捆在一起：给尺寸不等于要定格。
-   定格是探针要的（可复现截图），所以另留一个显式开关 `?live=1`：
-   带上它就只取尺寸、照常跑；不带则原样定格 —— 探针那批 `?w=&h=` 的判据全不受影响。
-   `ref-hero.html` 挂小镇时两个都要：要尺寸喂给它，也要狗在镇上走。 */
+/* ?chat= 和 ?ask= 打开面板时固定镇上狗的位置，便于可复现截图。 */
+/* ?w=&h= 显式指定尺寸；默认同时定格，live=1 保留动画，将尺寸传递与冻结区分。 */
 var FROZEN  = !Q.has("live") && (Q.has("w") || Q.has("click") || Q.has("hover")
               || SIT_ON || LIE_ON || Q.has("chat") || Q.has("ask") || Q.has("bub")
               || Q.has("scene"));
@@ -2041,21 +1613,15 @@ var DOG_MOVE = DOG_ON && !REDUCE && !FROZEN;
 var dog = DOG_ON ? dogFlat(DOG_L) : null;
 var dogT = DOG_T0, dogPh = DOG_PH0, dogFace = 1;
 var ORDER = [], worldG = null;
-/* ?dog=0.42 —— 把狗钉在路线上的某一点再截。拍胶片用：同一步态、不同位置，
-   才能把"狗画错了"和"狗站在别处"分开看。
-   （也可以拿它验路线：把一圈按 0.05 步长全拍一遍，谁的脚没踩在地面色上，
-   一眼就出来 —— `?w=&h=` 下的狗本来就不动，所以这几张是可复现的。） */
+/* ?dog= 固定路线进度，供同姿态不同位置的截图对照与沿路检查。 */
 var _dq = parseFloat(Q.get("dog"));
 if (isFinite(_dq)) dogT = _dq;
 // ?ph=0.375 —— 把步态相位钉住。同上，用来逐帧看腿。
 var _pq = parseFloat(Q.get("ph"));
 if (isFinite(_pq)) dogPh = _pq;
 
-/* 狗的行为：走够一段时间掷一次骰子（REST_P），中了就往最近的窗口走、到了就地趴下；
-   没中接着走，过一段再掷。?sit= 仍然只有参数入口，没有自动触发。
-   位置被两个窗口框住是几何原因：右过道只有 0.4 宽（趴下时是平铺的长条，一趴就压线），
-   广场边角贴着墙根和台阶，读起来像卡住了。一圈里狗两次经过广场，所以是两个区间。
-   边界 0.20 / 0.78 是跑图定的，判边缘要放大看，缩略图上读反过。 */
+/* 连续走够间隔后按 REST_P 投掷，命中则走到最近休息窗口趴下；否则稍后重试。
+   窗口限定无建筑遮挡、无遮挡的可见位置。 */
 
 /* 可趴窗口，路线参数 0..1。两个：去程一段、回程一段。 */
 var REST_WIN  = [[0.02, 0.19], [0.79, 0.97]];
@@ -2067,25 +1633,17 @@ var REST_T1   = 2.2;     // 首次掷骰前至少走几秒。这个数不是随�
 var REST_TLO  = 8.0;     // 之后每次隔多久掷（随机，免得形成节拍）
 var REST_THI  = 20.0;
 var REST_DOWN = 1.2;     // 卧倒用几秒
-var REST_HOLD = 33.0;    // 趴着不动几秒 —— 用户指定的数，不是调的
+var REST_HOLD = 33.0;    // 趴着不动几秒（定数，不是拿来调的）
 var REST_UP   = 1.1;     // 起身用几秒
-/* `?fast=N` —— 上面这几条时间一起除以 N。只为探针和预览：33 秒的趴下
-   意味着"等一分钟才轮到一次起身"，而"起身后到底冒不冒泡"正是气泡那件事唯一
-   要验的时机，那种等法验不动。正式页面不带这个参数，行为一模一样。
-   三条概率（`REST_P*`）不缩放 —— 它们不是时间。
-三行 `REST_*` 定义必须排在它上面，`var` 不会提升值。 */
+/* ?fast=N 按同一比例缩短行为时间，保持曲线关系，用于快速验证完整休息周期。 */
 var FAST = parseFloat(Q.get("fast"));
 if (isFinite(FAST) && FAST > 1){
   REST_T1 /= FAST; REST_TLO /= FAST; REST_THI /= FAST;
   REST_DOWN /= FAST; REST_HOLD /= FAST; REST_UP /= FAST;
 }
-/* st: 0 走路 / 1 卧倒 / 2 趴着 / 3 起身。`lie` 就是喂给 pose() 的那个量。
-   walk = 这一轮连续移动了多久（趴着和起身时不计 —— "移动一段时间"里的
-   "移动"要真的是移动）；wait = 攒到多久掷下一次；want = 已经掷中了，在等窗口。 */
-/* `up` 是起身完成的次数，纯给探针用（`_logs/_bubtime.py`）。它和
-   `BUB.tries` 配对成一条等式：「每次起身后都试过冒泡」= `tries === up + 1`
-   （那个 1 是页面安定后 `BUB_T_IN` 那条路）。等式比"看着像"硬得多 ——
-   把 `bubTry` 挪到别处，右边会瞬间失衡。 */
+/* rest.st：0 走路、1 卧倒、2 趴着、3 起身；lie 传给 pose()。
+   walk 统计移动时长，wait 为投掷间隔，want 为已命中等待窗口。 */
+/* up 统计完成起身次数；验证 BUB.tries===up+1，额外一次来自页面安定后的触发。 */
 var rest = { st: 0, t: 0, lie: 0, walk: 0, wait: REST_T1, want: false, first: true, up: 0 };
 
 /* 路线参数 → 位置 + 单位航向。t 绕圈取小数部分。 */
@@ -2099,18 +1657,12 @@ function routeAt(t){
           ux: (b[0]-a[0])/(SEG[i]||1), uy: (b[1]-a[1])/(SEG[i]||1)};
 }
 
-/* 把狗摆到当前位置，并按深度插进 world 的子节点里。
-   深度键用锚点（两前爪之间的落地点）的 x+y —— 和树用的是同一把尺子。
-   二分不必：ORDER 只有五十来项，而且每帧都只挪一次节点，
-   索引没变就不碰 DOM（见下）。 */
+/* 按狗落地锚点 x+y 插入 world 深度队列；ORDER 约五十项，直接扫描寻找插入点。 */
 function placeDog(){
   if (!dog || !worldG) return;
   var p = routeAt(dogT);
   var a = P(p.x, p.y, 0);
-  /* 朝向（镜像）由屏幕位移定，不由世界航向定 —— 镜像是个屏幕空间的决定。
-     沿世界 ±(1,1) 走时屏幕 dx 归零，镜像在那里没有定义；这时保持上一次的
-     朝向，否则狗会一边走一边左右抽搐。转视角同理：航向没变但屏幕朝向变了，
-     这里自动跟上。 */
+  /* 朝向由屏幕 dx 决定。dx≈0 时保留前朝向，避免投影零位移时反复镜像。 */
   var b = P(p.x + p.ux*0.12, p.y + p.uy*0.12, 0);
   var sdx = b[0] - a[0];
   if (Math.abs(sdx) > 0.05) dogFace = sdx < 0 ? -1 : 1;
@@ -2126,11 +1678,8 @@ function placeDog(){
   if (i < ORDER.length) worldG.insertBefore(dog.g, ORDER[i].e);
   else worldG.appendChild(dog.g);
 
-  /* 气泡。`a` 就在上面算好了（狗的落地锚点，world 坐标）—— 气泡要的是
-     头顶，所以往上抬 `BUB_HH`，趴下时抬得少。世界坐标 → `#wshift` 坐标
-     只差 world 那层 `translate(OX,OY) scale(sc)`，读它自己的矩阵即可
-     （`baseVal.consolidate()` 拿到的是元素自己的 transform 属性，
-     不含 root 的 viewBox 那一层 —— 用 `getCTM()` 就会把它一起算进来）。 */
+  /* 气泡在 world 落地锚点上方抬 BUB_HH，再经 world 自身矩阵转到 #wshift。
+     不使用 getCTM()，避免重复计算 root viewBox。 */
   if (bubG && worldG && worldG.transform.baseVal.numberOfItems){
     var m = worldG.transform.baseVal.consolidate().matrix;
     var hh = BUB_HH[0] + (BUB_HH[1] - BUB_HH[0]) * dogLie;
@@ -2152,9 +1701,7 @@ function inRestWin(t){
 function stepDog(dt){
   var s = DOG_SPEED * dt;
   if (rest.st === 0){
-    /* 掷中了就等走到窗口 —— 不预先选点：位置由"走到哪"自己定下来，
-       骰子掷中的时刻不同、停下的地方就不同，随机性天然就在里面，
-       用不着再抽一次"趴在哪一段"。 */
+    /* 掷中后等待走到休息窗口，停下的位置由命中时刻和路线共同决定。 */
     if (rest.want && inRestWin(dogT)){
       rest.want = false; rest.walk = 0;
       rest.st = 1; rest.t = 0;
@@ -2184,15 +1731,10 @@ function stepDog(dt){
     rest.lie = Math.max(0, 1 - rest.t / REST_UP);
     if (rest.t >= REST_UP){
       rest.st = 0; rest.t = 0; rest.lie = 0;
-      /* 起身后把计时清零重来。原来这里得写 `dogT += 0.002` 挪一丁点，
-         否则 `restAhead` 立刻又回到 0、下一帧原地再趴下去 —— 死循环。
-         现在不必了：趴不趴由骰子定，`want` 在趴下那一刻就清掉了。 */
+      /* 起身后清零休息计时；want 已在趴下时清除，无需额外推进 dogT。 */
       rest.walk = 0;
       rest.up++;                       // 探针的账：起身完成了几次
-/* 气泡就挂在这一行上 —— 起身完成那一刻，不是某个定时器：动作边界（趴下、起身）才是
-   它"做了个决定"的位置，挂在这里才像自言自语，挂在定时器上就是装饰。改这一块时留神：
-   `rest.st` 归 0 的地方只有这里一处，把 `bubTry` 挪到别处就等于把它从"起身后"改成了
-   "随便什么时候"。 */
+/* 起身完成、rest.st 清零前调用 bubTry，使气泡触发与动作边界保持一致。 */
       bubTry(BUB_P_UP);
     }
   }
@@ -2215,36 +1757,24 @@ function dogFrame(now){
   requestAnimationFrame(dogFrame);
 }
 
-/*   说话气泡。镇上那只狗偶尔冒一句话，两个触发点各投一次骰子：
-    起身之后 40%，页面安定两秒后 80%。挂法是刻意的 —— 挂在动作边界（趴下/起身）上
-    像自言自语，挂在定时器上就是装饰。文案两种：「汪！」「我是万事通」。
-    它长在 #wshift 里，所以面板打开、镇子被推左时跟着走，且不吃 world 那道 scale(sc)；
-    钟挂在 dogFrame 上，DOG_MOVE 为假时它不走（那时该说话的是面板里那只）。 */
+/* 气泡在起身后以 40%、页面安定两秒后以 80% 概率触发。
+   挂在 #wshift 下随镇子让位，不受 world 缩放；由 dogFrame 计时。 */
 var BUB_MSG  = ["汪！", "我是万事通"];
 var BUB_P_UP = 0.40;      // ① 起身后投中的概率
 var BUB_P_IN = 0.80;      // ② 页面安定后那一次
 var BUB_T_IN = 2.0;       // ② 安定下来几秒之后投
 var BUB_HOLD = 3.0;       // 一个气泡停几秒（含弹出来的那一下）
 var BUB_POP  = 0.16;      // 弹出来用几秒
-/* 气泡的尖离狗锚点多高（P 像素），[站着, 趴下] —— 趴下时头低下去，气泡得跟着低，
-   不然一只趴着的狗头上飘着一个半空的气泡。两个数：眼睛（`dogFlat` 唯一取到名字的
-   那个点）在 ?w=1300&h=900 下站着比锚点高 36 屏幕 px、趴下高 20，耳朵又比眼睛高
-   5.75 P 像素，所以"头顶"站着在 21.8、趴下在 14.6，各留 4 P 像素空隙。 */
+/* 气泡高度按站姿/趴姿分别设置，在头顶上方保留约 4 个 P 像素间距。 */
 var BUB_HH   = [26, 18];
-/* 气泡尖还要横向挪到头的底下：眼睛在局部坐标里 x=0.464，而锚点是两前爪
-   之间的落地点。不挪的话气泡是对着脚说话的，头在右边晾着。
-   用 `DOG_L * 0.464 * dogFace` 算而不是写死 24 像素 —— 那个 24 是
-   `0.464 × 22.8 × sc` 在 `?w=1300&h=900` 下的值，写死了换个窗口尺寸就不对。 */
+/* 气泡横向偏移 DOG_L*0.464*dogFace，与局部眼位同步，避免依赖固定屏幕尺寸。 */
 var BUB_EX   = 0.464;
 
 var BUB = { on:false, t:0, i:0, waitIn:BUB_T_IN, fires:0, lastSt:-1, tries:0 };
 var bubG = null, bubBox = null, bubTx = null;
 var bubX = 0, bubY = 0;               // `#wshift` 坐标，`placeDog()` 每帧算
 
-/* `?bub=1|2` —— 探针用：不等骰子，直接摆一个出来定格。
-   1 = 「汪！」/ 2 = 「我是万事通」。它一并进 FROZEN（见上），
-   所以 `?bub=1&w=&h=` 出的图是可复现的。`t` 直接给成弹完的状态，
-   定格要看的是完全展开的那个样子。 */
+/* ?bub=1|2 强制显示对应气泡并加入 FROZEN，进度设为完全展开。 */
 var _bubQ = Q.get("bub");
 if (_bubQ !== null && _bubQ !== "0"){
   BUB.on = true; BUB.t = BUB_POP; BUB.waitIn = 0;
@@ -2255,10 +1785,7 @@ function bubPaint(i){
   if (!bubG) return;
   BUB.i = Math.max(0, Math.min(BUB_MSG.length - 1, i | 0));
   bubTx.textContent = BUB_MSG[BUB.i];
-  /* 宽度跟着文字走。这里量的可能是兜底链的字宽 —— 内嵌 Zpix 是
-     `font-display:block`，第一次调用时它不一定就绪，所以 `bubMake` 里挂了
-     一次 `document.fonts.ready` 再重量一遍。不做那一步，气泡会先按错误的
-     宽度画出来再跳一下。 */
+  /* 字体就绪后重新测量气泡宽度，避免首次使用兜底字体时取宽不准。 */
   var tw = 0;
   try { tw = bubTx.getBBox().width; } catch(e){}
   var w = Math.max(28, Math.round(tw + 16)), h = 22, th = 6;
@@ -2275,9 +1802,7 @@ function bubApply(){
   if (!BUB.on){ bubG.setAttribute("display", "none"); return; }
   bubG.setAttribute("display", "");
   var u = Math.min(1, BUB.t / BUB_POP);
-  /* back-out：`1 + c3·(u−1)³ + c1·(u−1)²`。u=0 时正好是 0（从无到有），
-     途中过冲到 1.1 再收回来。这一下是"它开口了"这个信息本身，不是装饰：
-     没有它，两个字是无中生有地出现的，读不出"刚发生了一件事"。 */
+  /* back-out 曲线从 0 弹出、过冲约 1.1 后回落到 1。 */
   var s = u >= 1 ? 1 : (1 + 2.70158*Math.pow(u-1,3) + 1.70158*Math.pow(u-1,2));
   bubG.setAttribute("transform", "translate(" + bubX.toFixed(1) + "," + bubY.toFixed(1)
                      + ") scale(" + s.toFixed(3) + ")");
@@ -2302,10 +1827,7 @@ function bubMake(parent){
   bubApply();
 }
 
-/* 探针核"挂没挂在起身那一刻"靠的是 `tries`（本函数被调用了几次），不是 `lastSt`。
-   `lastSt` 是个坏量具：它读 `rest.st`，而触发点下面就是 `rest.st = 0`，所以它永远
-   是 0 —— 而 0 恰好是走路时最常见的状态，于是"全是 0"既可能对也可能错，什么都证明
-   不了（真页面和故意改坏的页面都报 0）。计数配对才行：`tries === rest.up + 1`。 */
+/* 触发验证使用 tries===rest.up+1；lastSt 在后续状态清零后不足以判断调用时机。 */
 function bubTry(p){
   BUB.tries++;
   if (REDUCE || !bubG || BUB.on) return;   // 已经在说就不打断
@@ -2348,10 +1870,7 @@ function build(){
   gr.appendChild(el("stop", {offset:"0", "stop-color":"#FF5A4E", "stop-opacity":"0.50"}));
   gr.appendChild(el("stop", {offset:"1", "stop-color":"#FF5A4E", "stop-opacity":"0"}));
   defs.appendChild(gr);
-/* 接触阴影必须是渐变，不能是实心块：实心多边形贴着房子四边等距外扩，连迎光那侧也
-   伸出一圈，读起来既不是影子也不是明暗，而是"雪地上有一块脏"。渐变中心压到 0.5
-   上下、外圈归零，边界就消失了，只剩墙根一圈变暗 —— 这才是"房子压在雪地上"。
-   颜色取自雪影的蓝而不是中性灰：雪地上的影子是蓝的，用灰的立刻显脏。 */
+/* 接触阴影使用蓝色渐变，中心约 0.5、外缘归零，避免墙外出现实心色带。 */
   var cg = el("radialGradient", {id:"contact"});
   cg.appendChild(el("stop", {offset:"0",    "stop-color":"#3F6191", "stop-opacity":"0.50"}));
   cg.appendChild(el("stop", {offset:"0.55", "stop-color":"#3F6191", "stop-opacity":"0.24"}));
@@ -2359,11 +1878,8 @@ function build(){
   defs.appendChild(cg);
   root.appendChild(defs);
   root.appendChild(el("rect", {x:0, y:0, width:W, height:H, fill:C.sky}));
-  /* 散星。位置是闭式，一个随机数都不抽 —— `rnd` 是共用的种子发生器，
-     在这里抽数会把后面所有建筑/树/雪的取数顺序整体挪位，整张图跟着变。
-     那就不是"加了一层星"，是"换了一张图"，而且截图基线全废。
-     (i*137.5+63)%W 是黄金角散布，和别的元素零耦合。
-     y 只铺到 0.78H：再往下是地平线以下，星不该出现在岛的脚下。 */
+  /* 散星采用 (i*137.5+63)%W 的闭式布局，不消耗建筑/树/雪共用的 rnd。
+     y 限于 0.78H 以上，避免出现在岛下。 */
   // 计数器单独起名（不用 i）：`var` 是函数作用域，build() 后面还有别的循环，
   // 共用同一个 i 会让两处互相改值。
   for (var si = 0; si < 26; si++){
@@ -2400,10 +1916,7 @@ function build(){
     flat.push({d:b.x + b.w/2 + b.y + b.d/2, e:building(b)});
   });
 
-  /* 路灯：沿主路点几盏。夜镇的暖光来源越多，画面越"有人住"。
-     原来还有一盏 [3.4,4.6] —— 那个坐标落在酒馆的地基里（酒馆 x∈[2,4.4]、y∈[3,5.2]），
-     而且它的排序键 d=7.99 比酒馆的 7.3 大，于是画在酒馆前面：
-     看着就是一根灯柱支在屋里。删。 */
+  /* 路灯避开建筑地基；[3.4,4.6] 位于酒馆内部，不使用该位置。 */
   [[4.6,7.4],[8.4,7.2],[6.4,9.2]].forEach(function(l){
     var lp = P(l[0], l[1], 0);
     flat.push({d:l[0]+l[1]-0.01, e:(function(){
@@ -2421,41 +1934,26 @@ function build(){
   // 树：避开房子、镇中的空地，以及岛的边界——跑到岛外面就是飘在天上
   for (var i = 0; i < 46; i++){
     var tx = J(0.6, 10.8), ty = J(0.6, 10.8);
-    // 5.35 太贴边了：岛的远缘在屏幕上比树根高约 26 像素，正好和树冠一样高，
-    // 于是树冠从那道缘线上面探出去 —— 整棵树看着浮在天上。
-    // 4.95 留出这一段，树冠就压在岛面以内。
+    // 树分布半径限制为 4.95，保留树冠到岛远缘的投影间距。
     if (Math.hypot(tx - 5.7, ty - 5.7) > 4.95) continue;
     var ok = !TOWN.some(function(b){ return tx>b.x-1.1 && tx<b.x+b.w+1.1 && ty>b.y-1.1 && ty<b.y+b.d+1.1; });
     if (!ok) continue;
-    /* 下面三条原本是给旧版的路面和广场让位的（"让开主路"）。路已经删了
-       （见 ground()），但它们留着：它们挡掉的正好是镇子内部那几处空地，
-       树长进去会把本来就不宽的间隙塞满、把房子推得更挤。
-       也就是说，它们现在的作用从"让开路面"变成了"别堵住镇子中间"。
-       谁要重新加路，这三条会告诉你哪块地是空的 —— 那正是路能走的地方。 */
+    /* 保留三条排除框，使镇内建筑间隙不被树木填满。 */
     if (tx>4.6 && tx<5.9 && ty<5.4) continue;
     if (tx>5.1 && tx<7.2 && ty>3.9 && ty<9.9) continue;
     if (tx>6.4 && tx<9.2 && ty>6.2 && ty<9.0) continue;
     flat.push({d:tx + ty, e:tree(tx, ty)});
   }
-  // 岛的右半边是空的。上面的循环撒不进来 —— 住宅的排除框是 w+2.2 见方，
-  // 一直盖到 x=11.2，那一片全被它挡掉了。手点三棵补上：左边一团树、右边
-  // 一片雪，重心是偏的。半径都在 4.95 以内，不会探出岛缘。
+  // 右半岛被住宅排除框覆盖，额外放三棵树平衡构图；半径保持在 4.95 内。
   [[8.8,2.1],[9.6,3.2],[10.3,4.6]].forEach(function(t){
     flat.push({d:t[0] + t[1], e:tree(t[0], t[1])});
   });
 
   flat.sort(function(a,b){ return a.d - b.d; });  flat.forEach(function(o){ world.appendChild(o.e); });
-  /* 排好序的这张表留到模块级。狗每帧要靠它二分出自己的深度位置
-     （第一个 d 比它大的元素，就插在那个元素前面）—— 这是"建完即冻结"
-     的管线上开的一扇小门：不重建任何元素，只挪一个节点。 */
+  /* 模块级保留深度排序表，供狗逐帧二分查找插入位置，无需重建场景。 */
   ORDER = flat; worldG = world;
-  /* `placeDog()` 不能排在这里。它现在还要摆气泡，而气泡要读 world 的
-     transform 矩阵、还要有 `#wshift` 当爹 —— 那两样都在下面。原来这一行就在这儿，
-     挪下去是因为加了气泡；把狗摆好这件事本身没有先后要求。 */
-/* 镇子再包一层 `<g id="wshift">`：面板打开时靠它左移（CSS 在 `#wshift` 那里）。包在
-   外面是因为 root 里除了 world 还有一块铺满全屏的天空 rect，直接推 root 或 `#stage`
-   会把天空一起推走、右边露出底色。world 自己那层 `translate(OX,OY) scale(sc)` 照旧
-   不动 —— 这两层是嵌套复合（CSS 的 transform 会盖掉同元素上的 transform 属性）。 */
+  /* placeDog() 需在 world transform 与 #wshift 建立后调用，以便定位气泡。 */
+/* #wshift 单独承担面板让位，避免移动天空或覆盖 world 的 translate/scale 属性。 */
   var wshift = el("g", { id:"wshift" });
   wshift.appendChild(world);
   root.appendChild(wshift);
@@ -2464,10 +1962,8 @@ function build(){
   // 变成一个菱形，半宽就是 R·√2·TW/2。改了 R 或 ZH 这里自动跟上。
   var R = 6.35, zTop = 7.6, CEN = 5.7;
   var bx = R * Math.SQRT2 * TW / 2;
-  // 顶边要减掉"镇中心那点的屏幕高度"：z 的位移是 −z·ZH，但整块世界还带着
-  // (x+y)·TH/2 那一项。只写 −zTop·ZH 等于假设最高点落在世界原点，于是
-  // 预留了一大片没人占的天空，缩放下拉、整个镇变小。
-  // zTop 里那多出来的 1.7 是旗子（尖端之上再 38 像素）。
+  // 包围盒顶边计入镇中心的投影高度 (x+y)·TH/2，避免多留天空、缩小镇子。
+  //    zTop 的 1.7 为尖顶上方构件预留高度。
   var by0 = 2*CEN * TH/2 - zTop * ZH;
   var by1 = (2*CEN + R * Math.SQRT2) * TH / 2;
   var sc = Math.min(W / (2*bx + 80), H / (by1 - by0 + 80));
@@ -2476,25 +1972,16 @@ function build(){
   world.setAttribute("transform",
     "translate(" + OX.toFixed(2) + "," + OY.toFixed(2) + ") scale(" + sc.toFixed(4) + ")");
 
-  /* 气泡挂在 `#wshift` 里、`world` 之后：跟着镇子一起被面板推走（对，它本来
-     就该跟着狗），但不吃 world 那道 `scale(sc)` —— 所以气泡的字号和线宽就是
-     屏幕像素，不用每帧反向缩放去抵消。挂在 world 里也能做，但那样每帧都要算一次
-     `scale(1/sc)`，而且气泡会被压在镇子的深度排序里。
-建在 `world.setAttribute("transform", …)` 之后：`placeDog()` 要读那个矩阵。 */
+  /* 气泡位于 #wshift 下、world 后，随镇子让位但使用屏幕字号和线宽。
+     world 变换设置完成后再创建，供 placeDog() 读取矩阵。 */
   bubMake(wshift);
   placeDog();
 
-/* 把 S 里的状态在离屏树上盖回来。`S` 活得下来，但灯的亮色、钉住的房名牌都写在节点
-   属性上，而每次 build() 都把节点删光重建。只在解锁那一刻调 relight() 的话，解锁后
-   任何一次重建镇子就暗回去、再也亮不回来（lit 10 → 7）；拖动模式每帧都 build()，
-   所以这不是边角情况。必须在 appendChild 之前做 —— 离屏节点没有 computed style，
-   `transition: fill .30s` 不会启动，元素生来就是亮的。 */
+/* build() 重建节点后从 S 恢复亮灯与固定名牌。
+   appendChild 前在离屏树设置属性，避免每次重建触发 .30s 过渡。 */
   restore();
   stage.innerHTML = "";
-/* 这里不能有 `stage.style.transform = "none"` 之类的残留：inline style 压得住任何
-   选择器，于是那条"开面板时镇子左移"的 CSS 永远不生效 —— CSS 一个字没错，
-   `getComputedStyle` 读回来却是 none。（那条规则现在挂在 `#wshift` 上、不再挂
-   `#stage`，但这一条不变。） */
+/* 不要以内联 transform 覆盖让位层的 CSS 位移。 */
   stage.appendChild(root);
   bind();
   return root;
@@ -2507,28 +1994,18 @@ function restore(){
   });
 }
 
-/* 井：转场 + 场景。点书店 → 黑幕从上面落下 → 再点 → 幕走完露出井；井里点「出口」→
-   幕从下面升上来 → 再走完露出小镇。进是整趟向下、出是整趟向上，状态机自然闭合。
-   一律用定时器不用 `transitionend` —— REDUCE 下过渡被跳过、事件不发。先给盒子再给
-   `src`（fx-throw 从 clientWidth 读尺寸，display:none 时量到 0×0）。 */
+/* 进入向下落幕、退出向上揭幕。用定时器收尾，以兼容 REDUCE 不触发 transitionend。
+   设置 iframe src 前先显示并确定尺寸，避免子页读到 0×0。 */
 var SCENE_SRC = { books:  "fx-throw.html?gate=1",
                   dev:    "desk.html?gate=1",
                   arcade: "fx-wall.html?gate=1",
                   boss:   "boss.html?gate=1",
                   contact:"contact.html?gate=1" };
-/* 这里没有 `dispatch:"fx-dispatch.html?gate=1"`：调度室封存后那个文件没再进过交付包，
-   而 `sceneArm` 只查"这个 k 在不在表里"、不查文件在不在磁盘上 —— 留着它，那两条
-   调试直链会去要一个不存在的页面，而本地永远测不出来（`proto/` 里那文件一直躺着），
-   只在部署之后才 404。落到兜底上会换成书店。 */
-/* 第三条链（暗房）不走 iframe，它住在这一页自己身上（理由见 CSS 那边）。
-   下面每一处判"这条链怎么开"都必须是 `SCENE_SRC[k] || SCENE_INLINE[k]` ——
-   只查 SCENE_SRC 的话暗房会被当成没登记的房子，静默开成书店，
-   而幕上那 5 行字也会跟着变成书店那套（txApply 拿的是同一个 k）。 */
+/* 调度室未进入交付包，因此不登记 SCENE_SRC；未知 key 回退书店。 */
+/* 场景有效性统一检查 SCENE_SRC[k] || SCENE_INLINE[k]，同时覆盖 iframe 与暗房 canvas。 */
 var SCENE_INLINE = { dark: true };
 var VEIL_T = 620;                       // 和 CSS 的 .62s 同源，改一个必改另一个
-/* 打赢之后结算浮层停多久才自己进字幕。那颗「前进」是发令枪，点一下立刻走；这个数
-   是"不点"的兜底，免得人停在那儿出不去。给 3 秒是为了结算那三行字（标题 + 正文 +
-   剩余血量）来得及读完：真在读的人会在读完时点下去，根本等不到这个定时器。 */
+/* 胜利结算最多停留 BOSS_HOLD（3 秒），点击前进可立即进入字幕。 */
 var BOSS_HOLD = 3000;
 var SCENE = { k:"books", open:false, ready:false, hello:false, go:false,
               t:0, txDone:false, txT:0, bossT:0 };
@@ -2549,23 +2026,16 @@ var cgText    = document.getElementById("cgText");
 var cgNext    = document.getElementById("cgNext");
 var storyTimer = 0;
 var comicStep = -1, comicRenderId = 0;
-/* 景别窗口，用狗的本地坐标。必须 slice 不是 meet —— 格子是横的、狗脸是方的，
-   meet 只能把它缩成中间一窄条；恰恰因为格子扁才必须裁。窗口是先定"必须看见
-   哪几个点"（下巴 0.617 / 嘴 / 眼 0.704 / 耳尖 0.911）再反推最小宽度，写窄
-   一点就静默切掉耳朵或嘴，代码不报错、只有出图能发现。head（第 2、5 格共用）
-   = 0.52 宽 × 0.44 高，x0 = 0.28：宽度定"能看见什么"、位置定"靠哪边"。 */
+/* 特写采用 slice。head 窗口 x0=0.28、宽 0.52、高 0.44，兼顾嘴、眼和耳。
+   修改窗口时需检查特征点是否被裁掉。 */
 var DCROP = {
   head: { x0:0.28, x1:0.80, y0:0.545, y1:0.985, fit:"slice" }
 };
-/* 五格的顺序和内容都是给定的。每格 `art` 里只有一句 `<em>`，那就是字幕，逐字照录、
-   别润色 —— 包括「堂堂大狗激热降临」（疑似"激烈"的笔误，照录，交付时当面问）。
-   每格不要再加三字概括当主标题。第 3 格那个"人"不是内嵌原图（那张带"豆包AI生成"
-   水印），只照构图重画；头顶那枚"人"字是点名要的。 */
+/* 五格各保留一句 <em> 字幕，不另加概括标题。
+   「堂堂大狗激热降临」沿用现有文案。第三格按参考构图重画，保留头顶「人」字。 */
 var COMIC = [
   { key:"door", cls:"door",
-    /* 门 + 从门洞里荡出来的信号弧。门是竖的椭圆、格子也是竖的，所以这一格天生
-       适合当开场空镜。这里不放 `<span class="comic-slab">`（横贯全格的浅灰板，
-       当"平台顶面"）—— 那一条已删，见 CSS 里 `.comic-slab` 那一段的说明。 */
+    /* 门与同心信号弧组成开场空镜。 */
     art:'<span class="comic-door"></span>'
       + '<svg class="comic-emit" viewBox="0 0 100 100" aria-hidden="true">'
       + '<g fill="none" stroke="#8EE7FF" stroke-width="1.3" stroke-linecap="round">'
@@ -2579,16 +2049,10 @@ var COMIC = [
   { key:"dog", cls:"dog", dog:{ face:1, pose:{gait:false}, crop:"head" },
     art:'<em>看来有战斗啊。</em>' },
   { key:"man", cls:"man",
-    /* 第三格：viewBox 240/150 = 1.60，要和 .comic-man 那个盒子（264×160 ≈ 1.65）对齐，
-       对不齐 meet 会把整张画缩到盒子中间，不报错，只是"板和人都变小了"。
-       构图取第二版原样，头和身体共用同一条 #0b0b0e 描边。胳膊是"深色粗一档打底、
-       白色细一档压在上面"，白色形体落在白板上照样看得见。
-       别再优化这一格：去掉胳膊描边会让它在白板上整个消失，只剩两只椭圆。 */
+    /* 第三格 viewBox 比例 1.60，接近 .comic-man 的 264×160，避免 meet 过度缩小。
+       头身共用 #0b0b0e 描边；胳膊以深色粗线打底、白色细线覆盖，保证在白板上可见。 */
     art:'<svg class="comic-man" viewBox="0 0 240 150" aria-hidden="true">'
-      /* 身体先画。底边跟着板的斜度收（右 110 / 左 118）—— 板下缘在 x=150 处
-         113.5、x=90 处 122.5，底边取平的话右侧会从板底下戳出来一截。
-头和身体同一个 `<g>`、同一条描边：白色形体一律带深色边，这是全图的
-         语言（胳膊和手的双层、边宽 2，和这里的 2.4 是一路的）。 */
+      /* 身体底边随斜板收斜，避免穿过板底；头身同组使用深色描边。 */
       + '<g fill="#F2F5F9" stroke="#0b0b0e" stroke-width="2.4" stroke-linejoin="round">'
       + '<path d="M120 54 L150 72 L150 110 L90 118 L90 76 Z"/>'
       + '<circle cx="120" cy="42" r="21"/>'
@@ -2597,10 +2061,8 @@ var COMIC = [
          再补一条内线表示厚度（板厚 32，内线离上缘 24）。 */
       + '<path d="M0 104 L240 68 L240 100 L0 136 Z" fill="#F2F5F9"/>'
       + '<path d="M0 128 L240 92" fill="none" stroke="#0b0b0e" stroke-width="3"/>'
-      /* 手臂落在板的上缘下面几个单位才是"按在板面上"（压在线上就成了"扶着边"）：
-         板缘 x=104 处 88.4、x=136 处 83.6，手圆心取 96 / 90。
-这两条必须是两层（深 13 打底 + 白 9 覆面）。第四版把打底层删了、只留白色
-           —— 白线在白板上等于没画，出图就是"两只手浮在白板上"。判据见 `_comic5.py` [4e]。 */
+      /* 手臂圆心低于板上缘，表现按在板面上。
+         深色 13px 打底、白色 9px 覆面，保证白板前的轮廓可见。 */
       + '<g fill="none" stroke-linecap="round">'
       + '<path d="M95 78 L104 96" stroke="#0b0b0e" stroke-width="13"/>'
       + '<path d="M145 74 L136 90" stroke="#0b0b0e" stroke-width="13"/>'
@@ -2613,8 +2075,7 @@ var COMIC = [
       + '<ellipse cx="104" cy="96" rx="8" ry="5.5" fill="#F2F5F9" transform="rotate(-8.5 104 96)"/>'
       + '<ellipse cx="136" cy="90" rx="10" ry="7.5" fill="#0b0b0e" transform="rotate(-8.5 136 90)"/>'
       + '<ellipse cx="136" cy="90" rx="8" ry="5.5" fill="#F2F5F9" transform="rotate(-8.5 136 90)"/>'
-      /* 头顶那枚"人"字（「头上加个字"人"」）属于画面、不是字幕。
-         头 21~63 ⇒ 字基线放在 16，正好悬在头顶上方。 */
+      /* 头顶「人」字属于画面，基线 y=16，位于头部范围 21~63 上方。 */
       + '<text x="120" y="16" text-anchor="middle" font-size="17" font-weight="700" '
       + 'fill="#F2F5F9">人</text>'
       + '</svg>'
@@ -2623,18 +2084,14 @@ var COMIC = [
      和第 2 格是同一份几何，差别只在 viewBox 取哪一块、给多大。 */
   { key:"rush", cls:"rush", dog:{ face:1, pose:{ph:0.5} },
     art:'<span class="comic-door comic-door--right"></span>'
-      /* 三条速度线画在狗的身后（狗朝右冲，所以线在左边），长短不一才有层次。
-         没有它这一格看着就是"一只站着的狗" —— `dogFlat` 只有站和走两档，
-         没有"冲刺"这个姿势，硬造不如用漫画里通用的位移符号。 */
+      /* 三条长短不同的速度线放在朝右奔跑的狗身后。 */
       + '<svg class="comic-speed" viewBox="0 0 100 60" aria-hidden="true">'
       + '<g stroke="#8EE7FF" stroke-width="2.6" stroke-linecap="round" opacity=".45">'
       + '<path d="M6 14 H92"/><path d="M6 30 H64"/><path d="M6 46 H84"/>'
       + '</g></svg>'
       + '<em>既然是战斗啊，那没办法了，一起上吧！</em>' },
-/* 收尾：狗的头特写 —— 和第 2 格同一个窗口，但格子宽 1.5 倍，所以天生更近。
-   窗口是 head、嘴是默认 INK，只留 mouth/smile；`crop:"face"` + 红嘴那版已被否掉
-   （「第五张红色的去掉……你改的太奇怪了」）。嘴落在下巴描边带里、出图看不出，
-   别再"修"；`dogFlat()` 默认不建嘴，别去改它。 */
+/* 收尾使用与第二格相同的 head 窗口，格宽增加到 1.5 倍形成近景。
+   嘴保留默认 INK，仅启用 mouth/smile；dogFlat() 默认不建嘴。 */
   { key:"laugh", cls:"laugh", dog:{ face:1, pose:{gait:false}, crop:"head", mouth:1, smile:1 },
     art:'<em>堂堂大狗激热降临。</em>' }
 ];
@@ -2648,16 +2105,13 @@ function comicRender(step){
   piece.dataset.key = c.key;
   piece.innerHTML = c.art;
   comicArt.appendChild(piece);
-/* 顺序：先 append 进文档，再量 `getBBox()` —— 没进文档的 SVG 元素量不出几何
-   （浏览器行为不一，Chrome 里给 0），而 viewBox 就是拿它算的，量成 0 会得到一个空
-   viewBox，症状是"狗那一格什么都没有"，不像报错。`place(0,0,face)` 只做
-   `scale(±k,-k)` 不做平移，所以屏幕坐标就是局部坐标直接缩过来（x 乘 k、y 乘 −k）。 */
+/* 先 append 再测 getBBox()，保证 SVG 几何可测。
+   place(0,0,face) 仅缩放及翻轴，不追加平移。 */
   if (c.dog){
     var cp = c.dog.crop ? DCROP[c.dog.crop] : null;
     /* 怎么塞进格子由窗口自己说了算：特写那两档标了 `fit:"slice"`（铺满 + 裁），
        远景（没有 `crop`）走 `meet`（完整显示，狗只占格子一角）。理由见 `DCROP`。 */
-    /* `mouth:1` 才建嘴 —— `dogFlat()` 默认不建（镇上那只狗没有这一笔，见上面的注释）。
-       所以嘴只活在写着 `mouth:1` 的格子里，别去改 `dogFlat` 的默认值。 */
+    /* 仅显式 mouth:1 的漫画格创建嘴，保持 dogFlat 默认行为。 */
     var d = dogFlat(88, { mouth: c.dog.mouth }),
         sv = el("svg", {"class":"comic-dogart",
                         "preserveAspectRatio":"xMidYMid " + (cp && cp.fit ? cp.fit : "meet")});
@@ -2665,22 +2119,14 @@ function comicRender(step){
     sv.appendChild(d.g);
     d.place(0, 0, c.dog.face);
     d.pose(c.dog.pose);
-    /* 「笑」= 一张嘴 + 眯眼。 都必须在 `getBBox()` 之前定完型，
-       否则量的是没笑的那张脸（bbox 本身不变，但嘴是后加的节点）。
-       眯眼就是把 eye 的 `ry` 压下去 —— 镇上那只眨眼走的也是这条路
-       （`updateDog` 里 `0.031 * (1 - 0.88*avBlink(t))`），所以这不是新画法。 */
-/* 「笑」那张嘴比说话张得大 —— 0.070 是 0.050 的 1.4 倍，不改 `MOUTH_OPEN`、只在
-   这格里传大值。填色不许再改成红的：换成项圈那个 BELT 试过，已被否掉
-   （「第五张红色的去掉」「你改的太奇怪了」）—— 嘴就是 `dogFlat()` 给的 INK，
-   出图基本看不出张嘴，这是已知且接受的。别去改 `dogFlat()` 的默认值，面板头像也走那段。 */
+    /* 笑脸先完成嘴与眯眼设置，再测 getBBox()；眯眼通过压缩 eye.ry 实现。 */
+/* 笑嘴张开量为 0.070，是说话态 0.050 的 1.4 倍，仅在此格传入。
+   填色沿用 INK；不改 MOUTH_OPEN 或 dogFlat() 默认值，以免影响面板头像。 */
     if (d.mouth) d.mouth.setAttribute("d",
       c.dog.smile ? mouthD(1, 0.070) : mouthD(0.35));
     if (c.dog.smile) d.eye.setAttribute("ry", "0.010");
     var bb = d.g.getBBox(), k = d.k;
-    /* `face<0` 时 `place` 给的是 `scale(-k,-k)`：屏幕 x = -k·lx，所以框的起点要取
-       bbox 的右边翻过来那一个，不能一律用 `bb.x*k`。写错的症状很轻：SVG 上挂着
-       `overflow:visible`，偏出框的部分照样画出来，所以不是"被裁掉"，只是镜像那格
-       的狗在格里悄悄偏了四分之一格宽（起点 -32.7 该是 -54.8，差 22 个 viewBox 单位）。 */
+    /* face<0 时 x=-k·lx，镜像框起点需取 bbox 右缘的负值，而非 bb.x*k。 */
     var X0, Y0, WD, HT;
     if (cp){
       /* 本地 → SVG 用户坐标是 sx = k·lx、sy = -k·ly（y 翻成 SVG 的下正），
@@ -2697,8 +2143,7 @@ function comicRender(step){
                              + WD.toFixed(1) + " " + HT.toFixed(1));
   }
   requestAnimationFrame(function(){ piece.classList.add("show"); });
-  /* 收尾句：「画面已经拼完整。准备进入门后的战斗。」→「下一话，向南！」——
-     读起来是漫画的"次回预告"，比原来那句"提示语"更像收尾。中间态那句不动。 */
+  /* 收尾切换为「下一话，向南！」，中间态文案保持独立。 */
   comicCaption.textContent = step === COMIC.length - 1 ? "下一话，向南！" : "点击按钮，再补上一块现场记录。";
   comicNext.textContent = step === COMIC.length - 1 ? "进入战斗" : "补上一块";
 }
@@ -2726,14 +2171,10 @@ function comicSkipNow(){
 comicNext.addEventListener("click", comicAdvance);
 comicSkip.addEventListener("click", comicSkipNow);
 
-/* 幕上那 5 行字：逐行出现、电影光幕那种感觉，完了隔一段距离下面闪"点击任意处
-   进入"；字要带光晕，别跳得太快。默认按每行字数累计：5.5 字/秒、至少 1.35 秒，
-   标点另留短停。`--step` 管一行接一行多快、`--fade` 管每行自己浮起来多慢，
-   光动前者会让字变成闪现。`?txstep=…&txfade=…&txgap=…` 保留诊断；
-   时刻表只有 txApply 一张。 */
+/* 字幕默认按 5.5 字/秒累计，每行至少 1.35 秒，另计标点停顿。
+   txApply 统一时刻表；?txstep/txfade/txgap 分别覆盖步长、淡入与末尾间隔。 */
 function txMs(key, dflt){
-  // 不用 `parseInt(...) || dflt`：`?txstep=0` 会被 `||` 静默换成默认值，
-  //   看着像"参数没生效"。这个坑在这块地方踩过一次了（见 `?glow=0` 那次）。
+  // 显式解析参数，保留 ?txstep=0；不能用 parseInt(...) || dflt。
   var v = parseInt(Q.get(key), 10);
   return (isFinite(v) && v >= 0) ? v : dflt;
 }
@@ -2777,9 +2218,7 @@ function txApply(k){
 }
 txApply("books");                       // 默认那一套
 
-/* 开始播。REDUCE 下整段不播（CSS 那条 media query 已经把动画关了）：
-   字直接全在、提示常亮，也就不存在"出到一半"，`txDone` 立刻为真 ——
-   于是一下点击就揭井，而不是先"快进"一下（见 veilClick）。 */
+/* REDUCE 直接显示全文并置 txDone，点击即可进入场景。 */
 function txStart(){
   txClear();
   if (REDUCE){ veilTx.classList.add("full"); SCENE.txDone = true; return; }
@@ -2787,9 +2226,7 @@ function txStart(){
   SCENE.txT = setTimeout(function(){ SCENE.txDone = true; }, TX_DONE);
 }
 
-/* 复位到"还没播"。 调用时机只有两处，都是字在屏幕外的时候：
-   sceneArm 的动画落定之后、sceneExit 一开头 —— 所以复位永远看不见，
-   不必给它设计过渡。 */
+/* 字幕仅在屏幕外复位：sceneArm 落定后或 sceneExit 开始时。 */
 function txClear(){
   clearTimeout(SCENE.txT);
   veilTx.classList.remove("on");
@@ -2797,9 +2234,7 @@ function txClear(){
   SCENE.txDone = false;
 }
 
-/* 把幕拨到某个状态，`after` 在它走完之后跑。
-   `classList` 的增删挤在同一个 tick 里没关系 —— 过渡看的是计算值的变化，
-   浏览器拿旧值(+100%)对新值(0)照样补间。 */
+/* veilTo 设置幕状态，并在过渡结束后调用 after。 */
 function veilTo(cls, after){
   veilEl.classList.remove("down");
   veilEl.classList.remove("thru");
@@ -2808,38 +2243,27 @@ function veilTo(cls, after){
   if (after) SCENE.t = setTimeout(after, VEIL_T);
 }
 
-/* 拼出这一条链的 src。尺寸必须显式传 —— `desk.html` 在解析期就读
-   `innerWidth/innerHeight` 建相机（`aspect = W/H`），而这一页是"先 display:block
-   再填 src"，填的那一刻子文档还没有布局，量到 0×0 ⇒ `aspect = NaN`、相机矩阵
-   整个坏掉（不报错，只是画面空）。所以必须先 `classList.add("on")` 再调这里。 */
+/* 先显示 sceneWrap 再生成 src，并显式传尺寸；desk 在解析期据此建立相机。 */
 function sceneSrc(k){
   return SCENE_SRC[k] + "&w=" + Math.round(sceneWrap.clientWidth)
                       + "&h=" + Math.round(sceneWrap.clientHeight);
 }
 
-/* 暗房：游戏摄影的无限照片墙 —— 统一格子 + 覆盖裁剪，拖动 + 松手惯性，33 张全部
-   内联进本页。参考实现 `_ref/008-02-infinite-scrolling-canvas/`，改了六处：
-   ① 折回阈值原码差一个 margin，边界带里的图会先减再加、净位移为零再跳到另一边；
-   ② if 改 while 且两个条件分开写；③ Pointer Events + setPointerCapture；④ 处理 dpr；
-   ⑤ 加载时预缩一次；⑥ onload 配 onerror 和超时。手感参数可从 URL 试。 */
+/* 暗房无限照片墙：内联 33 张图，采用覆盖裁剪、环形回绕、指针捕获和松手惯性。
+   图片预缩并处理 DPR，加载设有错误与超时分支。 */
 var GAL = (function(){
   var cv = document.getElementById("gal");
   if (!cv) return null;
 
   function qn(key, dflt){
-    // 不用 `parseFloat(...) || dflt`：`?galk=0` 会被 `||` 静默换成默认值
-    //   （同一个坑在这页踩过一次，见 `txMs`）。
+    // 显式解析参数，保留 ?galk=0；不能用 parseFloat(...) || dflt。
     var v = parseFloat(Q.get(key));
     return isFinite(v) && v > 0 ? v : dflt;
   }
   var CW = Math.round(qn("galcw", 420));       // 格子，16:9
   var CH = Math.round(qn("galch", 236));
-  // 格子间距和"裁边"是两件事，别混。
-  //   裁边（createImageBitmap 那个 sx/sy）管的是"每张照片填满自己的格子" ——
-  //   不做它，宽高比不匹配的照片会在格子里露黑边，那才是"图片之间有大缝"的来源。
-  //   这里的 MG 是我另定的视觉参数（照片墙该多松），和裁边无关。
-  //   2026-10-08 用户报"空隙这么大" —— 原来是 140（横缝占格宽 33%、纵缝占格高 59%，
-  //   屏幕上只看得下约 2.5 行），实测一轮后定 50。
+  // 裁边负责让照片填满格子，MG 独立控制格间距。
+  // MG=50 时横缝约占格宽 12%，纵缝约占格高 21%。
   var MG = Math.round(qn("galmg", 50));        // 格子间距
   var K  = qn("galk", 3.0);                    // 惯性阻尼，1/秒（τ≈0.33s）
   var FRIC = Q.get("galnofric") !== "1";
@@ -2857,10 +2281,8 @@ var GAL = (function(){
   var drag = null, pend = { x: 0, y: 0 }, samples = [];
   var okN = 0, errN = 0, rzT = 0;
 
-/* 排版按视口自适应，不是写死 6×6：写死时纵向无缝上限是 `(rows-2)*SY + CH`，
-   高窗口会在底部露出一条空带 —— 环形回绕救不了它，那是点阵跨度小于视口。
-   判据 `(COLS-2)*SX + CW ≥ VW`（`+2` 就是从这里来的）；还要 `COLS*ROWS ≥ N`，
-   不够的话不是"重复"而是"缺席"：有几张照片永远不出现，而画面上一切正常。 */
+/* 网格按视口扩展，保证 (COLS−2)*SX+CW≥VW，纵向同理；
+   同时要求 COLS*ROWS≥N，确保所有照片都有槽位。 */
   function layout(){
     VW = Math.max(1, sceneWrap.clientWidth  || window.innerWidth);
     VH = Math.max(1, sceneWrap.clientHeight || window.innerHeight);
@@ -2877,10 +2299,8 @@ var GAL = (function(){
     ctx.imageSmoothingQuality = "high";
   }
 
-/* 相位取整一次、全体共用：每张图各自 `Math.round` 会在相邻图之间开 1px 缝（预缩过
-   的图，缝里直接露背景色，很显眼）。所以取整的是相位不是每张的位置 —— 各列是
-   `c*SX + 相位`，`SX` 是整数，相位落在设备像素上全体就都落在设备像素上。
-   回绕用取模不用循环：`x ∈ [0, PX+U]`，一趟 `if (x > U) x -= PX` 就够，不必 while。 */
+/* 全体共享一次取整后的相位，避免逐图取整产生 1px 缝。
+   整数 SX/SY 配合设备像素相位，回绕使用取模。 */
   function draw(){
     raf = 0;
     if (!ctx) return;
@@ -2931,10 +2351,7 @@ var GAL = (function(){
     if (!drag){ if (vx || vy) queue(); else last = 0; }
   }
 
-  /*  松手算速度
-不能用"最后两帧的差值"：事件合并 / 鼠标空闲后的一次大跳会被
-       线性放大成假甩飞。所以维护最近 120ms 的样本，用首末两端算。
-跨度 < 16ms 或样本 < 2 → 不甩（"按住不动然后松手"不该飞出去）。 */
+  /* 使用最近 120ms 样本的首末点估计松手速度；不足两点或跨度小于 16ms 时不启动惯性。 */
   function release(){
     var n = samples.length;
     vx = vy = 0;
@@ -2981,10 +2398,8 @@ var GAL = (function(){
   cv.addEventListener("pointerup", endDrag);
   cv.addEventListener("pointercancel", endDrag);
 
-/* 加载。预缩到设备像素、之后每帧 1:1 blit —— 这一步同时买断质量和帧时间：走 GPU
-   双线性会走样（缩放比 2.17×，采样点只有 2×2），逼它走高质量就掉进 CPU 重采样。
-   `createImageBitmap` 一次调用同时裁 + 缩。逐张 await 并在每张之间让一次主线程：
-   33 张连着解会把主线程按住，而幕上那 5 行字正在淡入（它们也是主线程的）。 */
+/* createImageBitmap 一次裁剪并预缩到设备像素，之后按 1:1 绘制。
+   逐张 await 并让出主线程，避免 33 张解码阻塞字幕淡入。 */
   function release_bmps(){
     for (var i = 0; i < IMG.length; i++){
       var b = IMG[i];
@@ -3033,9 +2448,7 @@ var GAL = (function(){
     step();
   }
 
-  /* `window.PHOTOS` 在本页末尾（`</body>` 前）才定义，而 `?scene=dark`
-     那条路是在解析期就跑的 —— 那一刻它还不存在。所以等一轮再读：
-     DOMContentLoaded 一定在那段 script 之后。 */
+  /* PHOTOS 在页尾定义；解析期 ?scene=dark 需等 DOMContentLoaded 后读取。 */
   function whenPhotos(cb){
     if (window.PHOTOS) return cb();
     if (document.readyState === "loading")
@@ -3119,15 +2532,10 @@ var GAL = (function(){
   return { arm: arm, reset: reset, state: state, ring: ring, note: note };
 })();
 
-/* 点了某栋通向内容区的房子：换字、幕落下来，把自己变成下一个可点的东西。
-   `k` 是房子的 key（`books` / `dev`）。
-`txApply(k)` 必须在最前面 —— 幕这时还悬在屏幕上方，换哪一套字看不见。
-`SCENE.open` 那道门保留：一次只开一条链，中途换目标没有意义。 */
+/* 打开内容前先 txApply(k)，在幕外换字；SCENE.open 限制同时只开一条场景链。 */
 function sceneArm(k){
   if (SCENE.open) return;
-  /* 兜底那行是全文件最危险的一行：漏登记的链不会报错，会静默开成书店
-     （连幕上那 5 行字都跟着变成书店那套 —— `txApply` 拿的是同一个 k）。
-     所以判据必须是 `SCENE_SRC[k] || SCENE_INLINE[k]`，不能只查前者。 */
+  /* 同时检查 SCENE_SRC 与 SCENE_INLINE，避免暗房被回退成书店。 */
   k = (SCENE_SRC[k] || SCENE_INLINE[k]) ? k : "books";
   SCENE.open = true;
   txApply(k);
@@ -3142,22 +2550,15 @@ function sceneArm(k){
   veilTo("down", function(){ SCENE.ready = true; txStart(); });
 }
 
-/* 放行井那 2.2 秒的入场（它带着 `?gate=1` 建好，自己不会动）。现在才叫是因为幕往下
-   让时井口大约 57ms 就露出来了（那条 cubic-bezier 起步很陡），那时入场才走了 2.6%，
-   所以这一刻放行、看到的基本是完整的一遍。顺序会出问题：井可能还没载完，这时
-   `postMessage` 发进虚空 —— 症状是"井永远冻在第 0 帧"而幕那头一切正常，所以拿
-   `SCENE.hello` 锁存，没报到就先记一笔、等 hello 来了补发。 */
+/* wellGo() 在揭幕时放行子页入场。
+   SCENE.hello 未就绪时锁存请求，待子页报到后补发，避免丢失 postMessage。 */
 function wellGo(){
   SCENE.go = true;
   if (SCENE.hello && sceneFr.contentWindow)
     sceneFr.contentWindow.postMessage({ what: "well-go" }, "*");
 }
 
-/* 再点幕：幕继续往下走完，露出井。走完就停在 +100%，不再动 ——
-   那是出场的起点，不需要"归位"。
-这里不碰 veilTx：字在幕中央，幕往下沉就是带着它一起沉下去，
-     这正是"电影光幕"该有的样子。要是让字在这儿淡掉反而是画蛇添足
-     （而且撤动画那一下会跳变，淡不干净）。复位交给 sceneExit。 */
+/* 再次点击后继续下移到 +100% 露出场景，字幕随幕离屏；复位由 sceneExit 处理。 */
 function sceneGo(){
   if (!SCENE.open || !SCENE.ready) return;
   SCENE.ready = false;
@@ -3165,10 +2566,8 @@ function sceneGo(){
   wellGo();                                      // 幕开始让开 = 井起钟（见上）
 }
 
-/* 从井里出来：第一段从下面升上来盖住井，第二段继续升上去露出小镇。井的 `src` 要清掉
-   —— 留着它，第二段揭开时井还在底下跑自己的钟（相框一直飞），下次进来也不是新的一口井。
-   `txClear()` 必须在第一段之前：幕这时停在 +100%，字整个在屏幕下方外面，复位看不见；
-   放到第一段之后幕已经升回 0，那 5 行字会重新冒出来停在黑幕上，再跟着第二段出去。 */
+/* 退出先升幕遮住场景，再清 src 并继续上移露出小镇。
+   txClear() 必须在第一段开始前调用，避免字幕在幕中央重新出现。 */
 function sceneExit(){
   if (!SCENE.open) return;
   SCENE.ready = false;
@@ -3176,27 +2575,19 @@ function sceneExit(){
   veilTo("down", function(){
     sceneWrap.classList.remove("on");
     sceneFr.removeAttribute("src");
-    /* 和上面那句并列：暗房是同文档的 canvas，它占着 33 张预缩 bitmap
-       （1440p 下 36 格 × 840×472 × 4B ≈ 57 MB）。不清的话退出去还挂着 ——
-       而且下次进来 `arm()` 会因为 `armed` 还是 true 直接返回，看到的是旧画面。 */
+    /* 退出时释放暗房 bitmap 并重置 armed，避免保留约 57MB 图像和旧画面。 */
     if (GAL) GAL.reset();
     sceneWrap.removeAttribute("data-k");
     SCENE.open = false;
     SCENE.hello = false;
     SCENE.go = false;                            // ← 下次进来要重新放行一次
     veilTo(null, null);                          // 0 → -100%：露出小镇
-    /* 焦点还给镇上 —— 和 `well-hello` 里 boss 那句 `sceneFr.focus()` 是一对。
-       战斗页抢走了焦点，不还的话打完回镇上键盘还是死的：镇子这一页收不到
-       任何键，尤其是 Escape —— 上面那个"转发给场景"的监听就挂在父页上。
-       对别的场景（井/开发室/文字墙）它是空操作：它们从来没抢过焦点。
-必须放在这个回调里、`sceneWrap` 已经摘掉之后，不能放在函数开头。 */
+    /* sceneWrap 隐藏后将焦点交回镇子，与战斗页进入时的 focus 配对。 */
     window.focus();
   });
 }
 
-/* 幕上的点击：字还在往外冒的时候点一下 → 先把 5 行全放出来，再点一下才进井
-   （手快的人不该点了个寂寞，也不该被"补一下"直接推进井里）。所以这一路上
-   第一次点击是快进，第二次才是 sceneGo。 */
+/* 字幕未完成时点击先快进；下一次点击才调用 sceneGo。 */
 function veilClick(){
   if (!SCENE.open || !SCENE.ready) return;
   if (!SCENE.txDone){                            // 第一下：快进到终态
@@ -3214,9 +2605,7 @@ veilEl.addEventListener("keydown", function(e){
   if (e.key === "Enter" || e.key === " "){ e.preventDefault(); veilClick(); }
 });
 
-/* 井那边只能靠 postMessage 报到 —— 跨文档读不到它的变量。
-   不能拿 `e.origin` 当门：file:// 下它是不透明的，认不出自己人。
-   用消息里的 `what` 字段认，并让井那边带一个只有这两页知道的字符串。 */
+/* 子页用 postMessage 报到；file:// 的 origin 不用于识别，改按约定 what 字段处理。 */
 window.addEventListener("message", function(e){
   var d = e.data;
   if (!d || typeof d !== "object") return;
@@ -3225,34 +2614,23 @@ window.addEventListener("message", function(e){
     if (SCENE.k !== "boss") markContent(SCENE.k === "dev" ? "home" : SCENE.k);
     if (SCENE.k === "boss"){
       markContent("boss");
-/* 把键盘焦点交给战斗页。真因不在物理在焦点：boss 的键盘监听挂在 iframe 自己的
-   window 上，而从镇上进来时焦点留在父页，于是 WASD 一个都到不了它。敢在这儿抢，
-   是因为战斗这几分钟键盘本来就该归它（镇子被整个盖住）；`sceneExit()` 里要还回去。
-   放在 `well-hello` 这一刻而不是 sceneArm：arm 时文档还在导航，focus 会被作废。 */
+/* 收到战斗页 well-hello 后 focus iframe，确保 WASD 到达子页；退出时归还焦点。 */
       sceneFr.focus();
       if (sceneFr.contentWindow) sceneFr.contentWindow.postMessage({what:"well-go"}, "*");
       return;
     }
-    /* 报到晚了一步：`wellGo()` 已经跑过（幕早在往下让），那一声消息发进了
-       虚空。在这里补发 —— 不补的话井永远冻在第 0 帧，而幕那一头一切正常。
-       `?scene=go` 那条路必然走这里（加载时就放行，hello 还没到）。 */
+    /* 若 wellGo() 先于 hello 到达，在报到后补发；?scene=go 同样走此分支。 */
     if (SCENE.go && sceneFr.contentWindow)
       sceneFr.contentWindow.postMessage({ what: "well-go" }, "*");
   }
   else if (d.what === "boss-won"){
     S.bossResult = "won";
-/* 不在这儿放幕。`wonScene()` 会让父页立刻自己放幕，而 `#veil` 是 z-index:40、
-   装 iframe 的 `#sceneWrap` 是 30，幕一落定（620ms）就把整个结算浮层盖住 ——
-   结算来不及看，那颗「前进」也永远点不到。现在停 `BOSS_HOLD`：点「前进」立刻
-   进字幕，不点也兜底自己走。 */
+/* 先保留胜利结算浮层；点击前进或等待 BOSS_HOLD 后再落幕，避免遮住结算按钮。 */
     clearTimeout(SCENE.bossT);
     SCENE.bossT = setTimeout(wonScene, BOSS_HOLD);
   }
   else if (d.what === "boss-next"){
-    /* 结算浮层那颗「前进」= 进字幕。把兜底那颗定时器掐掉，立刻走。
-它只在这条路上用：赢的时候 Boss 发的是 `boss-next`，
-         输的时候发的是 `well-exit`（走下面那一段回镇上）。
-         两条路绝不能并成一条 —— 见 boss.html 里 `goNext()` 的注释。 */
+    /* boss-next 取消兜底定时器并进入战后字幕；失败的 well-exit 走返回小镇分支。 */
     clearTimeout(SCENE.bossT);
     wonScene();
   }
@@ -3261,28 +2639,18 @@ window.addEventListener("message", function(e){
   }
   else if (d.what === "well-exit"){
     closeComic();
-    /* 联系页是这条故事线的尾巴：从它退出来等于整段走完了，所以走
-       `finishStory()`（它连 `cgStep` / `bossResult` 一起复位）。别的房子退出
-       只是"回镇上"，那两步留着 —— 别把两种语义并成一条。
-`won` 也算：打赢后那套字幕转场露出来的就是联系页，只是 `SCENE.k`
-         记的是 "won"（因为 `txApply("won")` 设的），不是 "contact"。 */
+    /* 联系页及 won 退出均调用 finishStory()，同时复位 cgStep/bossResult；其他场景只返回小镇。 */
     if (SCENE.k === "contact" || SCENE.k === "won") finishStory();
     else { sceneExit(); S.story = "town"; }
   }
 });
 
-/* `?scene=1` 定格在"幕已落下"（可以拍那一格），`?scene=go` 直接到井；
-   `dev`/`dark`/`arcade`/`contact` 各是同一对。前缀匹配按顺序撞，所以 dark /
-   arcade 必须排在 books 之前（判据是 `indexOf(...) === 0`，不是全等）。
-   井那条链的三个老值一个字都不能改，出图定格的基线全在它们上面。`contact…`
-   是联系页唯一的直通车 —— Boss 一辈子只开一次，否则看过一遍就再也调不出来。 */
+/* ?scene= 各场景提供落幕定格和 …go 直达入口；前缀匹配优先排列 dark/arcade。
+   保留 books 的旧诊断值，以及可重复访问的 contact 入口。 */
 if (Q.has("scene")){
   var sv = Q.get("scene");
-  /* `won`（打赢后那套字幕）得单独走一条：`wonScene()` 不走 `sceneArm`
-     （理由见那个函数上方），而 `sceneArm("won")` 会被内部的兜底静默换成书店。
-     `?scene=won` 定格在"幕已落下、字正在逐行出来"；`?scene=wongo` 直接推到
-     "幕已让开、露出联系页" —— 和别的那几条 `…go` 是同一对手。
-判据是 `indexOf(...) === 0`（前缀），"won" 和表里任何一条都不撞。 */
+  /* won 使用 wonScene()，不走 sceneArm 的默认回退。
+     ?scene=won 定格字幕，?scene=wongo 直接揭开联系页。 */
   var isWon = sv.indexOf("won") === 0;
   if (isWon){ wonScene(); clearTimeout(SCENE.t); wonEnter(); }
   else sceneArm(sv.indexOf("dispatch") === 0 ? "dispatch"
@@ -3292,11 +2660,7 @@ if (Q.has("scene")){
           : sv.indexOf("arcade") === 0 ? "arcade" : "books");
   clearTimeout(SCENE.t);
   if (isWon){
-    /* 上面 `wonEnter()` 已经手动进过了（定格用），这里只管 `wongo` 那条：
-       把幕推到 +100%，露出底下已经换好的联系页。
-`wellGo()` 不能漏 —— 正常流程里它是 `sceneGo()` 发的，而定格这条路
-         整个跳过了 `sceneGo`。漏了的话联系页收到 `?gate=1` 会永远冻在第 0 帧
-         （它自己不会动），看着像卡住，而这边一切正常。 */
+    /* wongo 将幕置于 +100% 并调用 wellGo()，放行带 ?gate=1 的联系页。 */
     if (sv === "wongo"){
       veilEl.classList.remove("down"); veilEl.classList.add("thru");
       wellGo();
@@ -3307,35 +2671,24 @@ if (Q.has("scene")){
     wellGo();                       // 定格这条路也要放行，否则里面冻在第 0 帧
   } else {
     SCENE.ready = true;
-/* `txStart()` 必须在这里补一次。上面那句 `clearTimeout(SCENE.t)` 取消的正是 `sceneArm`
-   里 `veilTo("down", …)` 的收尾回调，而 `txStart()` 就在那个回调里面 —— 漏了它，
-   `?scene=` 定格这条路从来就没播过那几行字（`veilTx` 连 `on` 都没有，整块幕是空的）。
-   读代码看不出来：`sceneArm` 里明明写着 `txStart()`，是别处把它取消了。 */
+/* 定格分支取消了 sceneArm 收尾定时器，需显式补 txStart() 以显示字幕。 */
     txStart();
   }
 }
 
-/* 焦点在父页时，iframe 里那一页自己的 `keydown` 收不到任何键 —— 而"一进开发室什么
-   都没点就先按 Esc"恰恰就是这个状态，所以这里替它转发一次（那边收到 `well-esc` 就走
-   它的两级 Esc）。只发给正在开着的那一页，井收到会忽略（它只认 `well-go`）。
-   不能改用 `sceneFr.focus()` 抢焦点：那会让镇子这一页收不到后续键盘事件。 */
+/* 父页转发 Esc 给当前场景的 well-esc，让开发室处理两级退出。 */
 window.addEventListener("keydown", function(e){
   if (e.key !== "Escape") return;
-  /* 公告板要先收：它在最上层（z-index 30，盖着整座镇子），而上面那条
-     转发只认 `SCENE.open`。不先收的话，开着牌子按 Esc 会去关底下那个场景，
-     屏幕上却是牌子纹丝不动 —— 看起来像"Esc 坏了"。 */
+  /* Esc 优先收起顶层公告板，再处理底下的场景。 */
   if (NOTICE.open){ closeNotice(); return; }
   if (!SCENE.open) return;
-  /* 暗房是同文档的，不能走 postMessage：这条链上 `sceneFr` 根本没有 src，
-     发给它是发进虚空（井那头的两级 Esc 才是靠它）。 */
+  /* 暗房为同文档 canvas，直接处理退出，不向空 iframe 发消息。 */
   if (SCENE.k === "dark"){ sceneExit(); return; }
   if (sceneFr.contentWindow)
     sceneFr.contentWindow.postMessage({ what: "well-esc" }, "*");
 });
 
-/*  交互：这是"功能性"那一半
-   房子亮灯 = 这里有东西可看。点过三次，镇子会变——这就是你说的
-   "触发三次以上"那个机制的落点。 */
+/* 房屋亮灯表示可进入；累计点击三次后触发镇子变化。 */
 function bind(){
   root.querySelectorAll(".mystery-hit").forEach(function(hit){
     var lastTap = 0;
@@ -3351,10 +2704,7 @@ function bind(){
       }
       lastTap = now;
       clearTimeout(tapTimer);
-      /* 420ms 内等不到第二下 —— 什么都不做。单击侧壁不给提示（原先会弹一条
-         黄框 `showStory("再点一下灰色地面，开启神秘门")`，已去掉）。
-         定时器还留着，只为把 `lastTap` 归零、让"这一下单击"自己收尾 ——
-         别顺手连它一起删，双击窗口的语义就挂在这个变量上。 */
+      /* 单击侧壁只启动 420ms 双击窗口；到期清零 lastTap，不显示提示。 */
       tapTimer = setTimeout(function(){ lastTap = 0; }, 420);
     });
   });
@@ -3373,9 +2723,7 @@ function bind(){
         say("那里还没开发完成");
       }
       if (k === "tower") signalTower();
-      /* 公告板不做成一处内容（`markContent` 里已经把它排除了）——
-         它给的是"该去哪儿"的提示，不是能看的东西。所以这里只弹牌子，
-         不进 `sceneArm` 那条链（进去会走黑幕 + iframe，而它没有子页面）。 */
+      /* 公告板只弹出提示，不登记内容访问，也不进入 sceneArm。 */
       if (k === "board") openNotice();
       if (k === "books" || k === "home" || k === "dark" || k === "arcade"){
         sceneArm(k === "home" ? "dev" : k);
@@ -3392,19 +2740,13 @@ function showStory(text){
   clearTimeout(showStory.t);
   showStory.t = setTimeout(function(){ el.classList.remove("on"); }, 2600);
 }
-/* `won` 也要挡：打赢后走的是 `wonScene()`，`SCENE.k` 因此是 "won"，而
-   `well-hello` 一到就会拿它来登记（`markContent(SCENE.k === "dev" ? "home" : SCENE.k)`）
-   —— 不挡的话 `S.visited` 会多出一个 "won"，而这个字典的长度正是信号塔
-   "三处内容"的判据（`Object.keys(S.visited).length`，见 `signalTower`）。
-   "won" 是过场，不是一处内容。 */
+/* won 属于过场，不计入 S.visited，避免干扰信号塔的三处内容判定。 */
 function markContent(k){
   if (k === "tavern" || k === "tower" || k === "board" || k === "won") return;
   S.visited[k] = true;
 }
-/* CG 只有两格：战斗、电脑。第二格上再点一次接的是联系方式页本身，所以 `showCg(2)`
-   那条路整个没了。整条链现在是旁路状态（「时间不够了，先不做CG了，就字幕转场」），
-   打赢走 `wonScene()`，于是 showCg / cgAdvance / openContact 和 `#cgPlace` 当前
-   都没有调用点。整段保留是有意的 —— 改这儿的文案之前先确认它真会显示。 */
+/* CG 战斗/电脑两格暂未接入流程；当前胜利走 wonScene()。
+   showCg/cgAdvance/openContact 与 #cgPlace 保留，修改前需确认调用路径。 */
 function showCg(step){
   S.story = "cg"; S.cgStep = step;
   cgTitle.textContent = step === 0 ? "战斗 CG：素材待提供" : "电脑 CG：素材待提供";
@@ -3413,20 +2755,15 @@ function showCg(step){
   cgNext.textContent = step === 0 ? "继续" : "联系方式";
   cgPlace.classList.add("on");
 }
-/* 从 CG 进联系方式页。走的是和别的房子同一条 `sceneArm()` 路
-   （幕落下来 → 幕上 5 行字 → 再点一下让开 → 露出 `contact.html`），
-   所以这里只多做一件事：把 CG 浮层收掉，别让它压在幕上面。 */
+/* CG 转联系页时先收起 CG 浮层，再走 sceneArm 的字幕转场。 */
 function openContact(){
   if (S.story !== "cg") return;
   cgPlace.classList.remove("on");
   S.story = "contact";
   sceneArm("contact");
 }
-/* 打赢之后那一段：幕从下往上盖住 Boss 页，幕上是 `won` 那套字，点一下快进、
-   再点一下幕走开，露出来的是联系页（「先不做CG了，就字幕转场」）。
-   不能写 sceneArm("won") —— 它内部兜底会把 k 静默换成 "books"，幕上变成书店
-   那 5 行、点开是 fx-throw。所以内容页写死成 contact；`txApply("won")` 会设
-   SCENE.k，well-hello / well-exit 各有一处跟着改，别只改一半。 */
+/* 胜利后向上落幕并播放 won 字幕，再进入 contact。
+   不调用 sceneArm("won")，否则会回退书店；SCENE.k 继续保留 won 供消息分支判断。 */
 function wonEnter(){
   /* 换页放在幕落定之后：此刻幕正盖着屏幕，`boss.html` → `contact.html`
      的重新加载（iframe 有一段白底）看不见。放在落幕之前会白闪一下。 */
@@ -3434,15 +2771,9 @@ function wonEnter(){
   SCENE.ready = true; txStart();
 }
 function wonScene(){
-/* 不能写成 `if (SCENE.open) return;` —— 在真实入口上它必然把整条链吃掉：
-   打赢的时候 Boss 那一场正开着，于是 `boss-won` 到了、直接 return、什么都不发生，
-   看到的就是"打赢了，然后没有然后了"。`?scene=won` 和探针那两条路一直是绿的，
-   只因为它们跑在干净页上、这道闸从没被真实入口碰过。所以按 k 认。 */
+/* 仅按 SCENE.k 阻止重复进入；不能因 SCENE.open 为真拒绝处理当前 Boss 的胜利消息。 */
   if (SCENE.open && SCENE.k === "won") return;
-  /* Boss 留下的 `go` / `hello` 必须清掉。`startBoss()` 把 `SCENE.go` 设成了
-     true，而 `well-hello` 一到就拿它去 `wellGo()` —— 联系页带着 `?gate=1`
-     进来会被立刻放行，那 2.2 秒入场整段演在黑幕后面，揭开时看到的已经是终态。
-     和井那次是同一个坑。 */
+  /* 切换联系页前清除 Boss 的 go/hello，避免 gate=1 入场被旧状态提前放行。 */
   SCENE.go = false; SCENE.hello = false;
   SCENE.open = true;
   txApply("won");
@@ -3488,36 +2819,25 @@ function openMysteryDoor(){
   S.doorOpen = true; S.gateMsg="门已开启"; build(); sync(); showStory("神秘门开启");
 }
 
-/* 解锁后的样子：全镇的灯都亮起来。只写属性，不碰过渡 ——
-   build() 在离屏树上也要用同一份（见上面的 restore()），
-   那一刻不能有过渡，否则拖动时每帧都会重放一次 .30s 的补间。 */
+/* relight() 只写属性，兼容 build() 的离屏恢复，避免拖动重建时重复过渡。 */
 function litAll(){
   root.querySelectorAll(".win").forEach(function(w){
     w.setAttribute("fill", C.winLit); w.setAttribute("data-on","1");
   });
-  /* 下面这行目前是空转：全文件没有任何一处把 board 的 opacity 设成 0，
-     所以公告板从一进镇就看得见，"解锁才出现"这层意思并没有兑现。
-     定的条件是"只要访问过别的之后才能进入。这个具体之后说" ——
-     要的是"进不进得去"，不是"看不看得见"，细节后议。
-     所以这行先留着当钩子，别当成 bug 删掉，也先别擅自把它设成 0。 */
+  /* board.opacity=1 保留为解锁钩子；公告板当前初始可见，尚未接入访问条件。 */
   var b = root.querySelector('[data-k="board"]');
   if (b) b.style.opacity = "1";
 }
 // 解锁那一刻：在屏上写同样的属性，于是那份 .30s 的过渡真的会跑。
 function relight(){ litAll(); }
 
-/* 聊天面板：点镇上的狗，右侧拉出抽屉，镇子同时左移让位（位移在 `#stage` 上）。头像
-   不是图片 —— `dogHead()` 把 `dogFlat()` 再画一遍、用 viewBox 裁到头上，于是头像和
-   街上那只共用同一份几何，改了狗两边一起变（另存 png 的代价是"改了狗忘了重截"）。
-   坐标坑：`dogFlat()` 的局部坐标 y 向上，靠 `place()` 里 `scale(k,-k)` 的负号翻过来。 */
+/* 点击狗打开聊天抽屉，#wshift 同步让位；dogHead() 复用 dogFlat 几何。
+   狗局部 y 向上，由 scale(k,-k) 转为 SVG 坐标。 */
 var CHAT = { open:false };
 var NOTICE = { open:false };
 
-/*  头像活着：眨眼 + 呼吸 + 说话。
-    眨眼证明这张脸是活的不是截图；呼吸最弱，头像只裁到头、胸腔不在框里，
-    幅度压在 1 像素以下；说话补 LAG 那 340ms 的空档，让"点完选项没反应"变成"它在答话"。
-    只有顶栏那只动（#c-avTop 登记进 AV.face）—— 历史记录里十几个头一起眨是合唱不是狗。
-    相位用两个不可通约的周期叠出来，不用 Math.random，否则 ?av= 定格失效。 */
+/* 仅顶栏头像执行眨眼、呼吸和说话，历史头像保持静态。
+   相位由不可通约周期计算，支持 ?av= 定格；呼吸幅度低于 1px。 */
 function avNum(v){ var f = parseFloat(v); return isFinite(f) ? f : null; }
 function avClamp01(v){ return v < 0 ? 0 : (v > 1 ? 1 : v); }
 var AV_PIN   = avNum(Q.get("av"));      // ?av=<秒>   钉住时钟
@@ -3566,9 +2886,7 @@ function avFrame(now){
   avApply();
   if (!FROZEN) requestAnimationFrame(avFrame);
 }
-/* 狗要开口。`lead` 是"话说出口之前"那段（就是 LAG）；后面补 0.18 秒让嘴
-   比气泡晚一点合上 —— 同时收尾读起来才像"话是从这张嘴里出来的"。
-   最短 0.30 秒：`?ask=` 那条路上 LAG=0，也得留出看得见的一动。 */
+/* 开口时长包含 lead 并额外延后 0.18 秒闭嘴，最短 0.30 秒。 */
 function dogSpeak(lead){ AV.sayT = Math.max(0.30, (lead || 0) + 0.18); }
 
 /* `live` 只有顶栏那一份传 true。行内头像停在静止帧上（`AV.face` 只有一个槽，
@@ -3581,22 +2899,14 @@ function dogHead(live){
      当 none 处理，而影子本来就在框外 —— 直接摘掉，别留一个靠浏览器兜底的引用。 */
   var sh = d.g.querySelector('[fill*="contact"]');
   if (sh && sh.parentNode) sh.parentNode.removeChild(sh);
-/* 框按 `SK` 表里的头给的，不是估的：鼻尖 x=0.593、耳尖 y=0.911、颈线 x=0.248（局部
-   y 向上，而这个 svg 里 y 向下，所以纵轴取负）。大小在真实的 36px 下定的，不是按
-   120px 挑的 —— 36px 才是这个头真正被看到的尺寸，而圆周只切四角、耳朵在左上角、
-   鼻子在右下角，"看着填满正方形"的那几版反而先被啃掉鼻尖和项圈。 */
+/* 头像框按 SK 的头部特征点确定，局部 y 转负；以真实 36px 显示尺寸检查鼻尖、耳尖和项圈。 */
   var s = el("svg", { viewBox:"0.20 -0.955 0.44 0.44",
                       preserveAspectRatio:"xMidYMid slice" });
-  /* 多包一层 `<g>`：`d.g` 的 transform 被上面那个 `scale(1,-1)` 占着，而
-     呼吸/点头是在 svg 这个坐标系（y 向下）里做平移。直接改 `d.g` 会把
-     翻转冲掉 —— 而倒着的狗在一张 36px 的小脸上一眼看不出是"上下反了"，
-     只像"这狗画得怪"（同一个坑，见上面那段注释）。 */
+  /* 额外 g 承担呼吸与点头位移，保留 d.g 的 scale(1,-1) 翻轴变换。 */
   var box = el("g", {});
   box.appendChild(d.g);
   s.appendChild(box);
-  /* `d.mouth` 这里一定不是 null —— 上面就是按 mouth:1 建的。
-     真为 null 的话 `avApply` 会在第一帧就抛，`?chat=` 那条路上
-     `window.__probe` 还排在后面，探针会连挂都不挂上，只报"什么都没发生"。 */
+  /* 此处由 mouth:1 创建，d.mouth 必须存在，供 avApply 使用。 */
   if (live){
     AV.face = { box:box, eye:d.eye, mouth:d.mouth };
     avApply();   // 定格路上 rAF 早跑完了，新登记的这份得当场补一次相位
@@ -3648,9 +2958,7 @@ function sayMe(text){
   msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
-/* 词库。口述原文，一个字没改 —— 口述稿只在会话记录里，磁盘上没有第二份，
-   所以搜文件会误判成"一句台词都没有"。`q` 印在按钮上、`a` 是狗回的、
-   `next` 是选过之后换成谁。`yspell` 的拼错是故意的，别顺手修好。 */
+/* q 为选项、a 为回答、next 指向后续条目；yspell 的拼写差异为对话内容。 */
 var LINES = {
   here:    {q:"这里是哪里",         a:"既从来处来，自往到处去"},
   where:   {q:"我要去哪里",         a:"去到处之间找我"},
@@ -3671,10 +2979,7 @@ var LINES = {
   whybad2: {q:"为什么说你坏！？",   a:"我作为狗，只想多说狗话，汪，被迫用你的话语规范自己，汪汪心里苦"}
 };
 
-/* 池子 = 三个定项之外、也不在链条上的那些，顺序照口述。
-   抽数用另起的 rng：`rnd` 是 build() 共用的种子发生器，在别处抽数会把镇上
-   所有元素的取数顺序整体挪位（"加了一层星"变成"换了一张图"就是这个坑）。
-   这个是运行时才动的，两边互不干扰。 */
+/* 聊天池使用独立 rng，不消耗 build() 的 rnd，保持镇子构图可复现。 */
 var POOL0 = ["yspell", "howmany", "nice", "music", "born",
              "whydeep", "whenlie", "flatcity", "who", "hi"];
 var chatRnd = mulberry32((parseInt(Q.get("cseed"), 10) || (Date.now() & 0x7fffffff)) >>> 0);
@@ -3694,9 +2999,7 @@ function draw(){
   if (!live.length) return null;   // 到不了：池子 11 条、格子只有 4 个
   return live[Math.floor(chatRnd() * live.length)];
 }
-/* 重洗 = 池子回到开局那批，外加 `deep3`（两个序列会在重洗中加入的只有
-   「怎么进入深处！？」）。别的链上条目（deep2 / whybad / whybad2）不回池子 ——
-   它们属于"顺着问下去"那条路，掉进随手抽的池子里就不成序列了。 */
+/* 重洗恢复初始池并加入 deep3；deep2/whybad/whybad2 只保留在各自问答链中。 */
 function reshuffle(){
   pool = POOL0.slice();
   if (pool.indexOf("deep3") < 0) pool.push("deep3");
@@ -3728,10 +3031,7 @@ function advance(k){
   var L = LINES[k];
   say(L.a, thinkRow);
   thinkRow = null;
-  /* 嘴跟着这一句动，不再跟着 LAG。上一版是"点下去就开口、一直动到 LAG 走完"，
-     现在中间那段是「…」—— 狗在想、没在说话，嘴再动就前后矛盾了。
-     `?ask=` 那条路上 LAG=0，原来算出来也是这个值（`max(0.30, 0+0.18)`），
-     所以那条路一字未变。 */
+  /* 思考阶段不动嘴，advance() 显示回复时启动说话；?ask= 的 LAG=0 仍保留最短口型。 */
   dogSpeak(0);
   var pi = pool.indexOf(k); if (pi >= 0) pool.splice(pi, 1);   // 选过的离开库
   var idx = slots.indexOf(k);
@@ -3739,11 +3039,8 @@ function advance(k){
   renderOpts();
   busy = false;
 }
-/* 先出自己那句、停一下再出狗的 —— 大狗回复太快了。只把两条错开的话，面板上
-   什么都不发生，读起来还是"点完立刻就答"；现在中间先冒一个「…」（`sayThink()`），
-   到点原地换成真话。`?ask=` 那条路必须保持 0 —— 它靠 `pick` 里同步调 `advance`
-   才转得动，LAG 非 0 就整个空转。用 `isFinite` 而不是 `||`：`?lag=0` 会被 `||`
-   当成没给（同一个坑见幕上那段字的 `txMs`）。 */
+/* 先显示本人消息与思考气泡，LAG 后原地换成回复。
+   ?ask= 使用 LAG=0 同步验证；isFinite 保留显式 ?lag=0。 */
 function lagMs(key, dflt){
   var v = parseInt(Q.get(key), 10);
   return (isFinite(v) && v >= 0) ? v : dflt;
@@ -3766,8 +3063,7 @@ optsEl.addEventListener("click", function(e){
 function openChat(){
   if (CHAT.open) return;
   closeNotice();          // 公告板和聊天窗不同时开（理由见下面 notice 那一段）
-  // 开场第一句是用户点名的"汪！"（原来我写的是"你好"）。狗先叫一声，
-  // 再说人话——这也正好是气泡文案那两个字之一。
+  // 开场先发「汪！」。
   /* 第一次开：发牌 + 汪一声 + 摆出四个选项。三条是同一次初值，分开判断
      会让面板重开时出现"有词没选项"这种半截状态。 */
   if (!msgsEl.childElementCount){ resetChat(); say("汪！"); renderOpts(); dogSpeak(0); }
@@ -3782,10 +3078,7 @@ document.getElementById("c-x").addEventListener("click", function(e){
   e.stopPropagation(); closeChat();
 });
 
-/*  公告板
-   点镇上那栋「公告板」弹的木头牌子。和聊天窗互斥：两个浮层同时开着，
-   中间是木牌、右边是深棕聊天窗，两片遮罩还会互相压 —— 所以各自开的时候
-   顺手把对方关掉，不留"两个都开着"这个态。 */
+/* 公告板与聊天面板互斥打开，避免遮罩叠加。 */
 var noticeEl = document.getElementById("notice");
 function openNotice(){
   if (NOTICE.open) return;
@@ -3797,28 +3090,18 @@ function closeNotice(){
   noticeEl.classList.remove("on");
   NOTICE.open = false;
 }
-/* 点牌子外面关掉。
-判据必须是 `e.target === noticeEl`：遮罩就是 `#notice` 自己，牌子是它的
-   子元素。写成 `closest("#notice")` 会把牌子上的点击也算成"点外面"——
-   于是点一下牌子面板就关，而读代码时 `closest` 看起来完全正确。 */
+/* 仅 e.target===noticeEl 时按遮罩点击关闭，保留牌面内部点击。 */
 noticeEl.addEventListener("click", function(e){ if (e.target === noticeEl) closeNotice(); });
 document.getElementById("n-x").addEventListener("click", function(e){
   e.stopPropagation(); closeNotice();
 });
 
-/* 点狗开面板。狗是一堆 polygon 拼的，腿缝里点不着，所以盖一张透明命中矩形。
-   坐标按局部给：它跟着 g 的 scale(k,-k) 走，不用管狗走到屏幕哪儿了。
-   局部 y 向上，所以矩形该盖 `y ∈ [-0.05, 0.98]` —— 写成 `-0.98` 起就是上下
-   反的，而反了照样能点（命中区只是错位），属于"看不出错"的那一类。 */
+/* 透明矩形补足狗的点击区域，使用随 g 变换的局部 y∈[-0.05,0.98]。 */
 if (dog){
   dog.g.appendChild(el("rect", {x:-0.05, y:-0.05, width:1.05, height:1.03,
                                 fill:"transparent", "pointer-events":"all",
                                 class:"doghit", style:"cursor:pointer"}));
-/* 这里不能用 `dog.g.addEventListener("click", …)`：拖动那边在 pointerdown 里调了
-   `stage.setPointerCapture()`，指针一被捕获，后续 click 的 target 就被重定向到
-   `#stage`，根本不走狗这条节点路径（事件确实派发了，但 handler 一次都不跑）。
-   而 `?chat=1` 走的是直接调 `openChat()` 的捷径、正好绕开这条链，所以从没被验过。
-   改用和拖动同一套判据：pointerdown 记起点 → pointerup 且没拖过才算点击。 */
+/* 狗点击使用 pointerdown/up 的位移判定，避免 stage 指针捕获重定向 click。 */
   var dogDown = false, dogMoved = false, dx0 = 0, dy0 = 0;
   addEventListener("pointerdown", function(e){
     dogMoved = false;
@@ -3837,9 +3120,7 @@ if (dog){
   addEventListener("pointercancel", function(){ dogDown = false; });
 }
 
-/*  雪：常驻的那一层
-   ZATO 的雪同时是"极地气候 + 封闭城市 + 停不下来"。这里的雪要能
-   回答同样的问题，所以它不是贴图——它跟着镇子的状态变。 */
+/* 常驻雪层随镇子状态变化。 */
 var flakes = [], snowCv = document.getElementById("snow"), sctx = snowCv.getContext("2d");
 var DPR = Math.min(2, window.devicePixelRatio || 1);
 function initSnow(){
@@ -3856,10 +3137,7 @@ function initSnow(){
 var last = 0;
 function snowFrame(now){
   if (REDUCE){ return; }
-/* 定格截图（`?w=` / `?click=` / `?hover=`）里这层雪要画一次就停，那一帧还得可复现：
-   `dt` 取 0，雪花停在 `initSnow()` 撒下的位置上。它不认 FROZEN 的话每张截图的雪
-   各落各的，逐像素 A/B 自检因此永远过不了（差 1700+ 像素），把镇上所有像素验证
-   一起废掉了。是不重新排程，不是"排了但 dt=0"—— 后者每帧还在白烧一个 rAF。 */
+/* FROZEN 下以 dt=0 绘制初始雪帧，不再安排 rAF，保持截图可复现。 */
   var dt = FROZEN ? 0 : Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
   sctx.clearRect(0, 0, W, H);
   var speedMul = S.unlocked ? 0.45 : 1;   // 解锁后雪慢下来：规则失效，就像 ZATO
@@ -3877,13 +3155,8 @@ function snowFrame(now){
 
 function sync(){
   var h = document.getElementById("hud");
-  /* 拖动常开之后，这行 HUD 就是那句缺了很久的提示（"按住拖动 ←→ 转视角"）——
-     不写出来，人不会知道镇子能转，而这正是上一轮的病根。
-     但定格截图（?w= / ?click= / ?hover=）不能被它污染，所以借 FROZEN 挡一道。 */
-/* 这一行是两半，别再加回成一条：`tip`（"按住拖动 ←→ 转视角"）是给人看的 —— 拖动常开，
-   不写出来没人知道镇子能转；`dbg`（yaw / clicks / unlocked / hover）是探针读数。原来
-   两个无条件拼在一起，正常进镇子左下角就永远挂着一个像调试面板的东西。读数只在
-   `?probe` 下拼进来；探针脚本要读 yaw 就带 `?probe=1`。 */
+  /* HUD 提示拖动转视角；FROZEN 时隐藏，避免影响定格截图。 */
+/* HUD 分开显示拖动提示与调试数据；yaw/clicks/unlocked/hover 仅在 ?probe 下输出。 */
   if (Q.has("probe") || (DRAG && !FROZEN)){
     var tip = DRAG ? "按住拖动 ←→ 转视角" : "";
     var txt = Q.has("probe")
@@ -3907,16 +3180,11 @@ window.__probe = {
             dog: DOG_ON, dogMove: DOG_MOVE, frozen: FROZEN,
             dogT: +dogT.toFixed(4), dogPh: +dogPh.toFixed(4),
             dogLie: +dogLie.toFixed(3), rest: rest.st,
-            /* 这一行是给"狗怎么还不趴"准备的：`restWalk` 是这一轮走了多久、
-               `restWait` 是攒到多久掷下一次、`restWant` 是已经掷中在等窗口。
-               少了它们，判断狗的行为只能靠盯着看，而"没趴"和"趴坏了"
-               在截图上是两件完全不同的事。 */
+            /* 休息诊断：restWalk 为已走时长、restWait 为下次投掷间隔，restWant 为命中后等待窗口。 */
             restWalk: +rest.walk.toFixed(1), restWait: +rest.wait.toFixed(1),
             restWant: rest.want,
             dogSit: +dogSit.toFixed(4),
-            /* 狗在屏幕上的位置。判"狗到底走没走"必须看这个：
-               `dogT` 只在走路时累加，赶上它趴下那 33 秒就一动不动 ——
-               拿 `dogT` 不变去推"狗坏了"会得到一次假警报（也漏掉过假绿）。 */
+            /* 位置探针用于判断狗的实际移动；休息期间 dogT 保持不变。 */
             dogBox: (function(){ try{
                 var r = dog.g.getBoundingClientRect();
                 return [Math.round(r.left), Math.round(r.top),
@@ -3942,9 +3210,7 @@ window.__probe = {
   /* 坐姿量，0 = 站。和 `?sit=` 是同一个入口 —— 存在的理由是别让它只有一个
      URL 入口：那样"坐下时远腿藏没藏住"就只能靠截图看，量不了。 */
   sit: function(v){ dogSit = Math.max(0, Math.min(1, +v || 0)); placeDog(); return this.state(); },
-  /* 头像的相位。`?av=` 是加载期钉住，这条是运行期改 —— 出一排
-     对比图时在同一个页面里连拍，比开四次浏览器快，也顺带排除了
-     "两次加载的状态本来就不一样"。`say:null` 是解钉（交回给时钟）。 */
+  /* ?av= 固定加载相位，此接口运行时改相位；say:null 恢复时钟。 */
   av: function(o){
     o = o || {};
     if (o.t !== undefined) AV.t = +o.t || 0;
@@ -3956,17 +3222,12 @@ window.__probe = {
              eyeRy: +AV.face.eye.getAttribute("ry"),
              d: AV.face.mouth.getAttribute("d") };
   },
-/* 井：转场走到哪一步了。`veilY` 读的是矩形不是 class —— class 说"应该在哪"、矩形说
-   "现在在哪"，出图定格要后者。`w/h` 是井那个盒子的真实尺寸（display:none 时是 0×0，
-   而 0×0 的井在截图上也"有东西"）。`hello` 是跨文档的硬判据，比"盒子有尺寸"硬。
-   `txLit` 数当前这一套里有几行真亮了（computed opacity > 0.5），别拿 DOM 里有几个
-   `.vt-l` 当判据；`txHint` 是提示的透明度（呼吸，别写"必须 > 0.9"）。 */
+/* veilY 读取实际矩形位置，w/h 验证子页盒尺寸，hello 标记子页报到。
+   txLit 统计当前组 opacity>0.5 的行数；txHint 为提示实际透明度。 */
   scene: function(){
     var vr = veilEl.getBoundingClientRect();
     var wr = sceneWrap.getBoundingClientRect();
-    /* `.vt-l` / `.vt-hint` 必须限定到当前这一套：两套字并排放在 HTML 里，
-       直接 `querySelectorAll(".vt-l")` 会把 5 + 4 数成 9，而 `txN` 正是
-       "该亮几行"那个判据的分母。`txHint` 同理 —— 不加限定会固定选中书店那一个。 */
+    /* 字幕探针限定到当前组，避免把多个组的行数和提示合并统计。 */
     var sel = '.vt-set[data-k="' + SCENE.k + '"] ';
     var ls = veilTx.querySelectorAll(sel + ".vt-l"), lit = 0;
     for (var i=0;i<ls.length;i++)
@@ -3992,17 +3253,12 @@ window.__probe = {
   openDoor: openMysteryDoor,
   comicNext: comicAdvance,
   comicSkip: comicSkipNow,
-/* 暗房画廊。`ok` 是解码成功的张数 —— "33 张都排进去了吗"只有这里问得到（`ring()` 数
-   的是格数，格数对不代表图都解出来了）。`X0/Y0` 是未取模的累积偏移，拖动前后做差就是
-   位移 —— 别去读屏幕像素，环形回绕会把相邻两帧的差搅成噪声。`vx/vy` 在松手之后必须先
-   非零、再递减，和 `?galnofric=1` 那条反向对照一比就出来了。 */
+/* 画廊 ok 为解码成功数；X0/Y0 为未取模累计位移，适合比较拖动距离。
+   松手后 vx/vy 应先非零再衰减，可与 ?galnofric=1 对照。 */
   gal: function(){ return GAL ? GAL.state() : null; },
   galRing: function(){ return GAL ? GAL.ring() : null; },
 
-  /* 气泡。`msg` 换文案、`on`/`t` 定相位，都当场重画（不重跑 rAF）。
-     `fires` / `lastSt` 是那条读代码看不出来的事：`bubTry` 是个普通函数，
-     谁都能调它 —— 所以"它到底挂没挂在起身那一刻"得拿运行时的事实核，
-     不能靠"我写在那儿了"。`lastSt` 应该是 3（起身那一支里 `rest.st` 还没归零）。 */
+  /* 气泡接口可改文案和相位并立即重画；fires/lastSt 记录实际触发状态。 */
   bub: function(o){
     o = o || {};
     if ("msg" in o){ bubPaint(+o.msg || 0); }
@@ -4022,9 +3278,7 @@ window.__probe = {
                        var m = worldG.transform.baseVal.consolidate().matrix;
                        var q = routeAt(dogT), a2 = P(q.x, q.y, 0);
                        return [+(m.a*a2[0]+m.e).toFixed(1), +(m.d*a2[1]+m.f).toFixed(1)]; })(),
-             /* 狗眼睛的屏幕中心。`dogXY` 是落地锚点，而气泡要贴的是头 ——
-                这两点差多远不该靠估：眼睛是狗身上唯一一个已经取到名字的点
-                （`dogFlat` 就把它返回出来了），拿它当"头在哪"的替身。 */
+             /* 眼睛屏幕中心作为头部位置参考，与落地锚点 dogXY 区分。 */
              eyeXY: (function(){ try { if (!dog || !dog.eye) return null;
                        var r = dog.eye.getBoundingClientRect();
                        return [Math.round(r.left + r.width/2), Math.round(r.top + r.height/2)]; }
@@ -4033,11 +3287,8 @@ window.__probe = {
                     return [+(b.x+bubX).toFixed(1), +(b.y+bubY).toFixed(1),
                             +b.width.toFixed(1), +b.height.toFixed(1)]; }
                     catch(e){ return null; } })(),
-             /* 屏幕像素矩形。上面那个 `box` 是 SVG 用户单位 —— 页面的 viewBox
-                是 `0 0 W H` 且 root 的 CSS 尺寸跟着走，所以两者在 ?w=&h= 下数值上
-                相等；但探针裁图用的是 `Page.captureScreenshot` 的页面像素，
-                拿 `box` 去裁就是"两个坐标系看着一样所以混着用"。
-                这一条不靠巧合。 */
+             /* 截图裁剪使用页面像素矩形。box 是 SVG 用户单位，
+                即使在 ?w=&h= 下数值相等，也应与 Page.captureScreenshot 的坐标明确区分。 */
              rect: (function(){ try { var r = bubG.getBoundingClientRect();
                     return [Math.round(r.left), Math.round(r.top),
                             Math.round(r.width), Math.round(r.height)]; }
@@ -4046,62 +3297,40 @@ window.__probe = {
 };
 
 document.getElementById("hud").style.display = Q.has("probe") ? "block" : "none";
-/* sync() 必须在这里就调一次。少了它，拖动模式下 HUD 要等第一次拖动之后
-   才出现 —— 于是"到底开没开拖动"只能靠猜，而我猜错过一次。 */
+/* 初始化时调用 sync()，立即显示 HUD 状态。 */
 build(); initSnow(); sync();
 
-/* `?yaw=drag` —— 按住镇子左右拖，实时转视角。现在夹在 ±30° 当小角度转动用
-   （越界视角走 `?yaw=`，那条路上没有夹子）。实现上只有一条要点：转视角改的是
-   `P()`，而 `P()` 在建 SVG 时就算完了，所以只能整棵重建 —— 想用 SVG 的 transform
-   糊过去不行，那个旋转会把 x/y 和 z 混进同一条屏幕轴，而屏幕坐标里已经丢掉了 z。
-   pointermove 一秒上百次，所以用 rAF 节流，一帧最多建一次。 */
+/* 拖动角度限制 ±30°，?yaw= 可诊断越界视角。
+   P() 已将深度投影到屏幕，转视角需重建 SVG；rAF 节流到每帧最多一次。 */
 if (DRAG){
   var dragging = false, moved = false, px0 = 0, yaw0 = 0, raf = 0, pid = 0;
-  /* 灵敏度：拖 130 像素走完整个 ±30°。定这个数是为了"拖满 = 一个自然的挥手距离"，
-     而不是撞墙 —— 撞墙感就是灵敏度太高，手一抖就到头了。 */
+  /* 灵敏度按约 130px 拖动覆盖 ±30° 范围设置。 */
   var K = 0.004;   // 弧度/像素
-  /* 夹在 ±30°。这是转视角的两条天花板：20° 立体感最好，30° 是最后一档，
-     45° 起房子开始散架、90° 能看进屋里。夹在拖动上，不夹在 setYaw 里 ——
-     `?yaw=90` 那种越界视角是探针，还要能开。 */
+  /* 仅限制手动拖动为 ±30°；setYaw 保留越界值以供几何诊断。 */
   var LIM = 30 * DEG;
   stage.style.cursor = "grab";
   document.body.style.cursor = "grab";
   stage.style.touchAction = "none";
   function apply(){ raf = 0; build(); initSnow(); sync(); }
   function queue(){ if (!raf) raf = requestAnimationFrame(apply); }
-  /* 监听挂在 window 上，不挂 stage。stage 是个内容撑开的 div，
-     盒子跟着 SVG 走；哪天它比窗口小，"按在黑边上"就什么都不会发生 ——
-     而整页都是深色天空，人根本看不出 stage 的边在哪。
-     挂 window 等于"窗口里任何地方都能拖"，没有代价。 */
+  /* 拖动监听挂在 window，允许从舞台盒之外的天空区域起拖。 */
   addEventListener("pointerdown", function(e){
-/* 面板上按下不算拖视角。这个监听挂在 window 上，不挡一道的话在面板里选字、滚动消息，
-   镇子会跟着转，光标还会变成抓手。`#sceneWrap` 那条是改成内联之后才冒出来的：井和
-   开发室是 iframe，里面的事件不冒泡到父文档；暗房是同文档的 canvas，拖照片会同时把
-   镇子转起来（每帧重建一整棵 SVG），既浪费又会悄悄改掉 yaw。 */
+/* 排除面板和 #sceneWrap 内的 pointerdown，避免操作聊天或暗房时同时旋转镇子。 */
     if (e.target && e.target.closest &&
         (e.target.closest("#chat") || e.target.closest("#notice") ||
          e.target.closest("#sceneWrap"))) return;
     dragging = true; moved = false; px0 = e.clientX; yaw0 = YAW; pid = e.pointerId;
-/* 捕获不在这里做，等真的拖起来了再做（见 pointermove）。这里捕获一次，整座镇子
-   所有能点的东西就全废了，而且毫无征兆：`setPointerCapture` 之后 pointerup 被重定向
-   到 stage，click 也派发在 stage 上，而房子是 stage 的后代、冒泡永远碰不到它们。
-   症状极具欺骗性 —— 鼠标底下确实是那栋楼、hover 标签照常弹，就是点不动。
-   把捕获打空，书店当场开。 */
+/* pointerdown 不捕获指针；达到拖动阈值后再捕获，保留房屋的正常 click 目标。 */
     document.body.style.cursor = "grabbing";
   });
   addEventListener("pointermove", function(e){
     if (!dragging) return;
     if (!moved && Math.abs(e.clientX - px0) > 4){
       moved = true;
-      /* 到"真的在拖"这一刻才捕获：要的是"拖出窗口外也还在拖"，而纯点击全程
-         不该遇到捕获（理由见 pointerdown 那段）。
-         合成事件（自测用）没有活动指针，会抛 NotFoundError —— 捕获失败不影响
-         拖动本身，所以吞掉。 */
+      /* 实际拖动后捕获指针；合成事件没有活动指针时可能抛 NotFoundError，不影响位移计算。 */
       try { stage.setPointerCapture(pid); } catch (err) {}
     }
-    /* 方向：往右拖，镇子跟着往右转 —— 手抓住地面拖的那个方向。
-       取正号（`yaw0 + dx*K`）是右拖 = 相机往左绕，手感像在推一堵墙。
-       所以这里取负。 */
+    /* 负号使向右拖动时镇子随手向右转。 */
     var want = yaw0 - (e.clientX - px0) * K;
     if (want >  LIM) want =  LIM;
     if (want < -LIM) want = -LIM;
@@ -4119,9 +3348,7 @@ if (DRAG){
 }
 if (!REDUCE) requestAnimationFrame(snowFrame);
 if (DOG_MOVE) requestAnimationFrame(dogFrame);
-/* 头像的钟：不受 DOG_MOVE 管。面板开着的时候镇上的狗多半是定格的
-   （`?chat=` / `?ask=` 都进 FROZEN），可头像恰恰是那时候要活着。
-   雪那条路也一样：常驻、只认 REDUCE 和 FROZEN。 */
+/* 头像时钟独立于 DOG_MOVE；自身按 REDUCE/FROZEN 控制，面板打开不冻结头像。 */
 if (!REDUCE) requestAnimationFrame(avFrame);
 
 /* 定格模式：?w=&h=&click=tavern:3 —— 同步渲染完再截，不依赖任何计时器。
@@ -4147,18 +3374,12 @@ if (Q.has("w") || Q.has("click") || Q.has("hover")){
 if (Q.has("chat")) openChat();
 if (Q.has("notice")) openNotice();
 
-/* 探针。"序列没乱、没重复、没卡死"这件事在图上读不出来 —— 四条链要几百次点击
-   之后才现形，所以给它一个能问的嘴：`window.__chat()` 读回四个格子 / 剩下的池子 /
-   按过的顺序；`?ask=N&slot=M` 自动点 N 次、每次点第 M 个格子（`&slot=2` 就是深处
-   那条链，`&cseed=` 固定抽签）。只为验证存在，不参与正常玩法。 */
+/* __chat() 输出选项、池和历史；?ask=N&slot=M 自动点击，?cseed= 固定抽签。 */
 window.__chat = function(){
   return { slots: slots && slots.slice(), pool: pool && pool.slice(),
            said: said.slice(), reshuffles: reshuffles };
 };
-/* 公告板的探针。`NOTICE.open` 单独不够 —— 它只说明类加上了、JS 走对了，不说明屏上
-   真有东西（CSS 选择器漏一条、或者 display 被别处覆盖，都是"状态对、画面空"）。
-   所以连 `getBoundingClientRect()` 一起报，宽高为 0 就是没显示出来。`items` 是渲染
-   出来的正文，用来逐条核对；`marks` 是 `::before` 生成的编号，只能问 computedStyle。 */
+/* 公告板探针同时输出开关状态、实际矩形、正文和 CSS counter 编号，检查是否真实可见。 */
 window.__notice = function(){
   var b = document.getElementById("noticeBoard"),
       lis = b.querySelectorAll(".n-list li"),
@@ -4191,11 +3412,8 @@ if (Q.has("ask")){
 addEventListener("error", function(e){
   document.title = "ERR " + (e.message || e.type) + " @" + (e.lineno || "?");
 });
-/* 预加载：趁你在镇上闲逛，先把游戏厅那 33 张墙图下掉。
-   游戏厅是唯一要另下 33 个文件的房子（1.78 MB），进去要等；别的房子要么内联
-   （暗房那 33 张 base64 就在本页里）、要么只有一两个文件。GitHub Pages 给 webp
-   的缓存是 max-age=600，先下一轮，iframe 再要时就直接命中。
-   ?nopreload=1 关掉它。张数 33 和 fx-wall.html 的 PHOTOS 同步，改了要跟着改。 */
+/* 预加载游戏厅的 33 张外链图（约 1.78MB），供 iframe 后续复用缓存。
+   ?nopreload=1 关闭；张数须与 fx-wall.html 的 PHOTOS 同步。 */
 (function(){
   if (Q.has("nopreload")) return;
   var c = navigator.connection || navigator.mozConnection
