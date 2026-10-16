@@ -133,12 +133,17 @@ function dash(){if(state!=="fight"||dog.dash>0||dog.dashCd>0)return;dog.dash=.22
 /* 打击感三件套：顿帧 + 击退 + 火花，缺一样打上去就像按了个开关。
    `dir` 是击退方向（= 攻击来向的反面），不是攻击来向。 */
 function burst(x,y,dir,col){for(var i=0;i<12;i++)sparks.push({x:x,y:y,vx:dir*(90+Math.random()*520),vy:(Math.random()-.5)*520,life:.16+Math.random()*.24,col:col})}
-function hitDog(dir,damage){if(state!=="fight"||dog.inv>0)return;dog.hp=Math.max(0,dog.hp-(damage===undefined?1:damage));dog.inv=1.0;shake=.34;hitStop=.085;
+function hitDog(dir,damage,kind){if(state!=="fight"||dog.inv>0)return false;
+ var fan=kind==="fan";
+ dog.hp=Math.max(0,dog.hp-(damage===undefined?1:damage));dog.inv=fan?.5:1.0;shake=.34;hitStop=Math.max(hitStop,fan?.2:.085);
  /* 击退 = 冲量 + 指数衰减，不是每帧乘固定比例 —— `v*=.88` 那种写法帧率一变
-    击退距离就变。总位移 ≈ v/K = 620/7.5 ≈ 83px。 */
- KB.t=.38;KB.vx=dir*620;if(dog.ground)dog.vy=-170;
- burst(dog.x-dir*14,dog.y-30,dir,"#ffd9e2");if(dog.hp<=0)finish(false)}
-function hitBoss(dir){if(state!=="fight"||foe.hit>0||foe.inv>0)return;foe.hp=Math.max(0,foe.hp-1);foe.hit=.18;shake=.2;hitStop=.055;foe.kx=dir*520;
+    击退距离就变。常规冲量 620，扇斩为 1240；衰减和击退硬直时长相同。 */
+ KB.t=.38;KB.vx=dir*(fan?1240:620);if(dog.ground)dog.vy=-170;
+ burst(dog.x-dir*14,dog.y-30,dir,"#ffd9e2");
+ if(fan&&MAX_STRENGTH){refundFoeAbility("lunge");foe.hp=Math.min(12,foe.hp+1)}
+ if(dog.hp<=0)finish(false);
+ return true}
+function hitBoss(dir){if(state!=="fight"||foe.hit>0||foe.inv>0)return;foe.hp=Math.max(0,foe.hp-1);foe.hit=.18;shake=.2;hitStop=Math.max(hitStop,.055);foe.kx=dir*520;
  burst(foe.x-dir*34,foe.y-42,dir,"#dff8ff");if(foe.hp<=0)finish(true)}
 /* 结算文案和配色取 foe.phase；父页保留 BOSS_HOLD，再由前进按钮或超时进入字幕。 */
 var battleStart = performance.now(), battleEnd = null, hudHP = -1, hudBossHP = -1;
@@ -169,6 +174,12 @@ function spendFoeAbility(kind){
     foe[kind + "Charges"]--;
     if (foe[kind + "Cd"] <= 0) foe[kind + "Cd"] = 4;
   } else foe[kind + "Cd"] = kind === "lunge" ? 12 : 6;
+}
+function refundFoeAbility(kind){
+  if(!MAX_STRENGTH)return;
+  var stock=kind+"Charges",cd=kind+"Cd";
+  foe[stock]=Math.min(2,foe[stock]+1);
+  if(foe[stock]===2)foe[cd]=0;
 }
 function updateFoeCooldowns(dt){
   ["lunge", "evade"].forEach(function(kind){
@@ -378,7 +389,7 @@ function stepFoeAction(dt){
     foe.x += Math.sign(dist) * Math.min(Math.abs(dist), BOSS_DASH_SPEED * activeDt);
     if (a.left <= 0 || Math.abs(a.target - foe.x) < .5){ a.kind = "slash"; a.left = .26; a.hit = false; }
   } else if (a.kind === "slash"){
-    if (!a.hit && slashHitsDog(a)){ a.hit = true; hitDog(a.face, 1.5); }
+    if (!a.hit && slashHitsDog(a)){ a.hit = true; hitDog(a.face, 1.5, "fan"); }
     if (a.left <= 0){
       foe.action = null; foe.retreatT = 2.4; foe.mode = "retreat";
       foe.target = -1; foe.pressT = 0; foe.think = 0;
@@ -608,7 +619,7 @@ document.getElementById("bossRank").textContent=BOSS_LEVEL?BossProgress.label(BO
 syncBattleHud();
 renderBestRecords();
 if(BOSS_LEVEL>=2)document.getElementById("hint").innerHTML+="<br>金色剑气会反弹，命中前不会消失。";
-if(MAX_STRENGTH)document.getElementById("hint").innerHTML+="<br>满加强：扇斩、闪避各储存两次，每4秒恢复一次。";
+if(MAX_STRENGTH)document.getElementById("hint").innerHTML+="<br>满加强：扇斩、闪避各储存两次，每4秒恢复一次。BOSS扇斩命中返还次数，并回复1点生命。";
 setTimeout(function(){document.getElementById("hint").classList.add("hide")},4600);
 window.addEventListener("message",function(e){if(e.data&&e.data.what==="well-esc")leaveGame()});requestAnimationFrame(frame);requestAnimationFrame(function(){requestAnimationFrame(function(){say("well-hello")})});
 /* 探针 dash 导出动作函数，状态从 dogState.dash 读取，避免同名属性覆盖。 */
