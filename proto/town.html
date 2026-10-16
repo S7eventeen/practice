@@ -326,6 +326,16 @@
     /* 减动效时思考点常亮；保留节点以覆盖 ?lag= 的异步等待。 */
     .c-dot{animation:none;opacity:1}
   }
+#arcadeAd{box-sizing:border-box;width:min(400px,calc(100vw - 36px));padding:0;border:3px solid #4a2632;border-radius:5px;background:#fff1d2;color:#472737;box-shadow:8px 8px 0 #070a12a0;font-family:"Microsoft YaHei",sans-serif}
+#arcadeAd::backdrop{background:#080d18a8;backdrop-filter:blur(3px)}
+#arcadeAd .ad-top{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#963b55;color:#fff0d9;font-size:12px;letter-spacing:.08em}
+#arcadeAdClose{width:25px;height:24px;padding:0;border:1px solid #f0b0ac;background:#652b43;color:#fff4e6;font-size:20px;line-height:1;cursor:pointer}
+#arcadeAd .ad-body{padding:25px 18px 22px;text-align:center}
+#arcadeAd h2{margin:0;font-size:clamp(20px,5.5vw,26px);line-height:1.5;color:#9c294c}
+#arcadeAd .ad-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:22px}
+#arcadeAd .ad-actions button{padding:9px 16px;border:1px solid #ad6a75;background:#fff8e7;color:#75374a;font:13px "Microsoft YaHei",sans-serif;cursor:pointer}
+#arcadeAdVisit{background:#963b55!important;color:#fff4dc!important}
+#arcadeAd button:focus-visible{outline:3px solid #edaa53;outline-offset:3px}
 </style>
 </head>
 <body>
@@ -366,6 +376,12 @@
 <!-- 井的 src 延迟到 sceneArm() 落幕时设置，避免提前运行 rAF。
      ?gate=1 继续等待 wellGo() 放行，再启动 2.2 秒入场。 -->
 <!-- 暗房 canvas 与场景 iframe 并列，#sceneWrap[data-k] 控制可见项。 -->
+<dialog id="arcadeAd" aria-labelledby="arcadeAdTitle">
+  <div class="ad-top"><span>游戏厅 · 新消息</span><button id="arcadeAdClose" type="button" aria-label="关闭广告">×</button></div>
+  <div class="ad-body"><h2 id="arcadeAdTitle">游戏厅上新啦！！！</h2>
+    <div class="ad-actions"><button id="arcadeAdVisit" type="button" autofocus>去游戏厅</button><button id="arcadeAdLater" type="button">稍后再说</button></div>
+  </div>
+</dialog>
 <div id="sceneWrap"><canvas id="gal"></canvas><iframe id="scene" title="井" tabindex="-1"></iframe><button id="gal-esc" type="button">退出</button></div>
 <div id="vortex" aria-hidden="true"><div id="comic"><div id="comicHead"><span>FIELD NOTE / SIGNAL EVENT</span><span id="comicCount"></span></div><div id="comicFrame"><div id="comicArt"></div></div><div id="comicCaption"></div><div id="comicActions"><button id="comicNext" type="button">补上一块</button><button id="comicSkip" type="button">跳过过场</button></div></div></div>
 <div id="cgPlace" aria-live="polite"><div id="cgCard"><div id="cgKicker">STORY PLACEHOLDER</div><h2 id="cgTitle"></h2><p id="cgText"></p><button id="cgNext" type="button">继续</button></div></div>
@@ -415,25 +431,25 @@
     </div>
     <div class="vt-hint">点击任意处进入</div>
   </div>
-  <!-- 调度室这一套（港口 / 岸桥 / 潮窗）。同样不写覆盖块，理由同上。 -->
+  <!-- 调度室字幕。 -->
   <div class="vt-set" data-k="dispatch">
     <div class="vt-lines">
-      <div class="vt-l" style="--i:0">港口不是一条流水线</div>
-      <div class="vt-l" style="--i:1">每一次等待都会改写全局顺序</div>
-      <div class="vt-l" style="--i:2">岸桥、泊位与潮窗要一起排</div>
-      <div class="vt-l" style="--i:3">把局部最优让给整船准点</div>
-      <div class="vt-l" style="--i:4">调度室，开始推演</div>
+      <div class="vt-l" style="--i:0">港口不是一厢情愿的交往</div>
+      <div class="vt-l" style="--i:1">每一次取舍都会暗中埋藏</div>
+      <div class="vt-l" style="--i:2">谁能算尽，而非迷汤</div>
+      <div class="vt-l" style="--i:3">台前，桌上</div>
+      <div class="vt-l" style="--i:4">调度室，推演开场</div>
     </div>
     <div class="vt-hint">点击任意处进入</div>
   </div>
-<!-- 联系方式这一套。文案是占位，等正式文案。 -->
+<!-- 联系方式字幕。 -->
   <div class="vt-set" data-k="contact">
     <div class="vt-lines">
-      <div class="vt-l" style="--i:0">门开了，路也走完了</div>
-      <div class="vt-l" style="--i:1">镇子外面还有话要说</div>
-      <div class="vt-l" style="--i:2">留两个地方给你找我</div>
-      <div class="vt-l" style="--i:3">微信 · QQ</div>
-      <div class="vt-l" style="--i:4">按一下继续</div>
+      <div class="vt-l" style="--i:0">走尽了路，看遍了芳</div>
+      <div class="vt-l" style="--i:1">追寻了信号，又前去何方</div>
+      <div class="vt-l" style="--i:2">联系下情景，去做些联想</div>
+      <div class="vt-l" style="--i:3">不要告诉我，也不说原谅</div>
+      <div class="vt-l" style="--i:4">说一段故事，感谢捧场</div>
     </div>
     <div class="vt-hint">点击任意处进入</div>
   </div>
@@ -450,6 +466,7 @@
     <div class="vt-hint">点击任意处进入</div>
   </div>
 </div></div>
+<script src="boss-progress.js"></script>
 <script>
 "use strict";
 var Q = new URLSearchParams(location.search);
@@ -520,9 +537,18 @@ var TOWN = [
   {k:"board",  n:"公告板",      x:8.0,y:8.0,w:1.2,d:0.9,h:1.10, wall:"wood",    roof:"roofGreen",  lit:0}
 ];
 
+var BOSS_CLEAR_KEY = "s7eventeen.bossCleared.v1";
+function readBossCleared(){
+  try { return localStorage.getItem(BOSS_CLEAR_KEY) === "1"; }
+  catch (e) { return false; }
+}
+function unlockBossReplay(){
+  S.bossCleared = true;
+  try { localStorage.setItem(BOSS_CLEAR_KEY, "1"); } catch (e) {}
+}
 var S = { clicks:{}, unlocked:false, hover:null, t:0,
   doorOpen:false, story:"town", signal:"idle", visited:{},
-  cgStep:0, bossResult:"", gateMsg:"" };
+  cgStep:0, bossResult:"", bossCleared:readBossCleared(), bossProgress:BossProgress.read(), gateMsg:"" };
 function total(){
   return Object.keys(S.clicks).reduce(function(sum, k){ return sum + (S.clicks[k] || 0); }, 0);
 }
@@ -2008,7 +2034,7 @@ var VEIL_T = 620;                       // 和 CSS 的 .62s 同源，改一个�
 /* 胜利结算最多停留 BOSS_HOLD（3 秒），点击前进可立即进入字幕。 */
 var BOSS_HOLD = 3000;
 var SCENE = { k:"books", open:false, ready:false, hello:false, go:false,
-              t:0, txDone:false, txT:0, bossT:0 };
+              t:0, txDone:false, txT:0, bossT:0, replay:false, bossLevel:1, bossRound:"", bossRoundWon:false };
 
 var veilEl    = document.getElementById("veil");
 var veilTx    = document.getElementById("veilTx");
@@ -2246,7 +2272,8 @@ function veilTo(cls, after){
 /* 先显示 sceneWrap 再生成 src，并显式传尺寸；desk 在解析期据此建立相机。 */
 function sceneSrc(k){
   return SCENE_SRC[k] + "&w=" + Math.round(sceneWrap.clientWidth)
-                      + "&h=" + Math.round(sceneWrap.clientHeight);
+                      + "&h=" + Math.round(sceneWrap.clientHeight)
+                      + (k === "arcade" ? "&bossCleared=" + (S.bossCleared ? "1" : "0") + BossProgress.params(S.bossProgress) : "");
 }
 
 /* 暗房无限照片墙：内联 33 张图，采用覆盖裁剪、环形回绕、指针捕获和松手惯性。
@@ -2570,6 +2597,8 @@ function sceneGo(){
    txClear() 必须在第一段开始前调用，避免字幕在幕中央重新出现。 */
 function sceneExit(){
   if (!SCENE.open) return;
+  if (SCENE.replay){ returnToArcade(); return; }
+  var advertiseArcade = SCENE.k === "contact" || SCENE.k === "won";
   SCENE.ready = false;
   txClear();
   veilTo("down", function(){
@@ -2581,7 +2610,7 @@ function sceneExit(){
     SCENE.open = false;
     SCENE.hello = false;
     SCENE.go = false;                            // ← 下次进来要重新放行一次
-    veilTo(null, null);                          // 0 → -100%：露出小镇
+    veilTo(null, advertiseArcade ? openArcadeAd : null); // 露出小镇后再弹广告
     /* sceneWrap 隐藏后将焦点交回镇子，与战斗页进入时的 focus 配对。 */
     window.focus();
   });
@@ -2608,12 +2637,43 @@ veilEl.addEventListener("keydown", function(e){
 /* 子页用 postMessage 报到；file:// 的 origin 不用于识别，改按约定 what 字段处理。 */
 window.addEventListener("message", function(e){
   var d = e.data;
-  if (!d || typeof d !== "object") return;
+  if (!d || typeof d !== "object" || e.source !== sceneFr.contentWindow || !SCENE.open) return;
+  if (d.what === "arcade-boss-replay"){
+    if (SCENE.k === "arcade" && SCENE.go) startArcadeBossReplay(d.full === true);
+    return;
+  }
+  if (d.what === "boss-replay-won"){
+    if (SCENE.replay && SCENE.k === "boss" && !SCENE.bossRoundWon
+        && d.round === SCENE.bossRound && d.level === SCENE.bossLevel
+        && typeof d.seconds === "number" && isFinite(d.seconds) && d.seconds >= 0){
+      SCENE.bossRoundWon = true;
+      S.bossProgress = BossProgress.victory(S.bossProgress, d.level, d.seconds);
+      BossProgress.save(S.bossProgress);
+    }
+    return;
+  }
+  if (d.what === "boss-replay-three"){
+    if (SCENE.replay && SCENE.k === "boss" && S.bossProgress.fullUnlocked) switchArcadeScene("boss", 3);
+    return;
+  }
+  if (d.what === "boss-replay-full"){
+    if (SCENE.replay && SCENE.k === "boss" && S.bossProgress.fullUnlocked) switchArcadeScene("boss", 4);
+    return;
+  }
+  if (d.what === "boss-replay-retry"){
+    if (SCENE.replay && SCENE.k === "boss") switchArcadeScene("boss", SCENE.bossLevel === 4 ? 4 : undefined);
+    return;
+  }
+  if (d.what === "boss-replay-exit"){
+    if (SCENE.replay && SCENE.k === "boss") returnToArcade();
+    return;
+  }
+  if (SCENE.replay && (d.what === "boss-won" || d.what === "boss-next" || d.what === "boss-lost")) return;
   if (d.what === "well-hello"){
     SCENE.hello = true;
     if (SCENE.k !== "boss") markContent(SCENE.k === "dev" ? "home" : SCENE.k);
     if (SCENE.k === "boss"){
-      markContent("boss");
+      if (!SCENE.replay) markContent("boss");
 /* 收到战斗页 well-hello 后 focus iframe，确保 WASD 到达子页；退出时归还焦点。 */
       sceneFr.focus();
       if (sceneFr.contentWindow) sceneFr.contentWindow.postMessage({what:"well-go"}, "*");
@@ -2624,12 +2684,15 @@ window.addEventListener("message", function(e){
       sceneFr.contentWindow.postMessage({ what: "well-go" }, "*");
   }
   else if (d.what === "boss-won"){
+    if (SCENE.k !== "boss") return;
     S.bossResult = "won";
+    unlockBossReplay();
 /* 先保留胜利结算浮层；点击前进或等待 BOSS_HOLD 后再落幕，避免遮住结算按钮。 */
     clearTimeout(SCENE.bossT);
     SCENE.bossT = setTimeout(wonScene, BOSS_HOLD);
   }
   else if (d.what === "boss-next"){
+    if (SCENE.k !== "boss" || S.bossResult !== "won") return;
     /* boss-next 取消兜底定时器并进入战后字幕；失败的 well-exit 走返回小镇分支。 */
     clearTimeout(SCENE.bossT);
     wonScene();
@@ -2785,6 +2848,30 @@ function finishStory(){
   cgPlace.classList.remove("on"); closeComic();
   S.story = "town"; S.cgStep = 0; S.bossResult = "";
   sceneExit();
+}
+var bossRoundSerial = 0;
+function switchArcadeScene(k, level){
+  if(level===4&&!S.bossProgress.fullUnlocked)return;
+  clearTimeout(SCENE.t); clearTimeout(SCENE.bossT); txClear();
+  SCENE.k = k; SCENE.hello = false; SCENE.ready = true; SCENE.go = true;
+  sceneWrap.setAttribute("data-k", k);
+  var src = sceneSrc(k);
+  if (SCENE.replay){
+    SCENE.bossLevel = level === 4 ? 4 : (level === 3 ? 3 : S.bossProgress.level); SCENE.bossRoundWon = false;
+    SCENE.bossRound = Date.now().toString(36) + "-" + (++bossRoundSerial);
+    src += "&replay=1&level=" + SCENE.bossLevel + "&round=" + SCENE.bossRound + BossProgress.params(S.bossProgress);
+  }
+  sceneFr.src = src;
+}
+function startArcadeBossReplay(full){
+  if(full&&!S.bossProgress.fullUnlocked)return;
+  if (!S.bossCleared || !SCENE.open || SCENE.k !== "arcade" || !SCENE.go) return;
+  SCENE.replay = true; S.story = "boss";
+  switchArcadeScene("boss", full ? 4 : undefined);
+}
+function returnToArcade(){
+  SCENE.replay = false; S.story = "town";
+  switchArcadeScene("arcade");
 }
 function startBoss(){
   if (S.story !== "entering") return;
@@ -3095,6 +3182,20 @@ noticeEl.addEventListener("click", function(e){ if (e.target === noticeEl) close
 document.getElementById("n-x").addEventListener("click", function(e){
   e.stopPropagation(); closeNotice();
 });
+
+var arcadeAdEl = document.getElementById("arcadeAd");
+function openArcadeAd(){
+  if(SCENE.open || S.story!=="town" || arcadeAdEl.open)return;
+  closeChat();closeNotice();arcadeAdEl.showModal();
+}
+function closeArcadeAd(){ if(arcadeAdEl.open)arcadeAdEl.close(); }
+document.getElementById("arcadeAdClose").addEventListener("click",closeArcadeAd);
+document.getElementById("arcadeAdLater").addEventListener("click",closeArcadeAd);
+document.getElementById("arcadeAdVisit").addEventListener("click",function(){
+  closeArcadeAd();
+  if(!SCENE.open&&S.story==="town")sceneArm("arcade");
+});
+arcadeAdEl.addEventListener("close",function(){window.focus();});
 
 /* 透明矩形补足狗的点击区域，使用随 g 变换的局部 y∈[-0.05,0.98]。 */
 if (dog){
@@ -3412,7 +3513,7 @@ if (Q.has("ask")){
 addEventListener("error", function(e){
   document.title = "ERR " + (e.message || e.type) + " @" + (e.lineno || "?");
 });
-/* 预加载游戏厅的 33 张外链图（约 1.78MB），供 iframe 后续复用缓存。
+/* 预加载游戏厅的 33 张游戏图和 Boss 战封面，供 iframe 后续复用缓存。
    ?nopreload=1 关闭；张数须与 fx-wall.html 的 PHOTOS 同步。 */
 (function(){
   if (Q.has("nopreload")) return;
@@ -3425,6 +3526,7 @@ addEventListener("error", function(e){
   var q = [];
   for (var i = 1; i <= 33; i++)
     q.push("../assets/wall/" + ("0" + i).slice(-2) + ".webp");
+  if (S.bossCleared) q.push("../assets/wall/boss-battle.webp");
 
   function next(){
     if (SCENE.open) return;      // 进了任何一栋房子就让路，别跟自己人抢连接

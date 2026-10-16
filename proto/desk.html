@@ -167,10 +167,9 @@
     background:#3f7ac0}
   .ic .pg::after{content:"";position:absolute;left:2px;right:2px;top:6px;bottom:2px;
     background:repeating-linear-gradient(180deg,#aeb9c4 0 1px,transparent 1px 3px)}
-  /* 联系方式使用 16px 纯绿图标，窗口仍为记事本。
-       显式 content:none 撤掉纸张基样式的两条伪元素。 */
-  .ic .pg.wx{width:16px;height:16px;margin:1px auto 2px;
-    background:#3ec15b;border:1px solid #2b9c46;border-radius:3px}
+  .ic .pg.wx{width:16px;height:16px;margin:1px auto 2px;overflow:hidden;
+    background:transparent;border:0;border-radius:0;box-shadow:none}
+  .ic .pg.wx .icon-wallpaper{right:auto;bottom:auto;pointer-events:none}
   .ic .pg.wx::before,
   .ic .pg.wx::after{content:none}
   /* 正开着的那一个 —— 桌面图标得有个"它在用"的样子，否则跟另外三个没分别 */
@@ -379,6 +378,9 @@ var DOC = (function () {
   return out.join('\n');
 })();
 
+var DESK_REWARD = "000.我，在相亲。她坐在对面，客套的话说完，我就忍不住开口问她——“你听说过厕所之神的故事吗？”\n\n她露出感兴趣的神情。\n\n我用着咏叹调，那是个古老的传说，有人在厕所里拉了一泡屎，下水的那一刻，马桶里浮现出一个神灵，问他拉的是金屎，还是银屎？\n\n就像童话里那个斧头掉进河里的樵夫。只是斧头变成了屎。要是你选择银屎，厕所之神就会把你马桶堵死。你要说你拉的是普通的屎，他就会让马桶冲得特别干净，还带点薄荷味。\n\n她说，金屎呢？我说，那他就会让你吃掉。\n\n她问，你小时候是不是一个人上厕所的时候想象很多怪东西？\n我说，对，小时候我有段时间特别怕厕所里突然伸出一只手，拉住我。那阵子我每次都在惊恐中完成速降，拉得又快又紧张。\n\n她问，那后来呢？\n我说，后来就想通了。我想如果厕所真的伸出一只手，那我就跟它握握手。\n\n她说你真的是我见过最奇怪的人。\n\n我们吃完，她提议去超市，说要买点纸巾。我说你不会是想拜那个厕所之神吧？\n\n她说，也许吧，我准备回家拿一张纸写信，把它冲下马桶里，看看他会不会出现。\n我说那你得写得诚恳一点，不能乱写。她说那你觉得我该写什么？\n\n我说你可以写：“尊敬的厕所之神，我不想拉金屎，也不想拉银屎，我就想拉得畅快一些，不费劲，不出血。”\n\n她一脸诧异的看着我;\n\n我说，我觉得人活着，如果能痛快拉屎其实就已经是半个幸福的人了。\n\n我们走到超市，天色已暗。她买了纸巾、洗发水，还有小瓶香水。\n\n收银台在排队，我看向外面，外面路灯映在玻璃上，人来人往。我开玩笑问她，是不是给厕所之神的见面礼？她说对，我要送一封香喷喷的信。\n\n她看着那些人说，每个人其实都活在自己的马桶里，谁也不知道下一秒是冲走，还是堵住。\n\n她把香水塞到我手里，说国庆节要到了，送你这个。你下次上厕所的时候，别只想着那只手了。\n\n我说我早就不怕了。那只手，从我开始幻想有人听我讲这些破事的时候，就消失不见了。\n\n她说那我回去了，明天还要上班。我说路上小心。她走出几步，又转头问我，如果有一天你真的见到厕所之神，你会问他什么？\n\n我说，我会问他，我这辈子，是不是个注定被冲走的人。\n\n她说，你不是。然后摆摆手，走进夜色里。\n\n我站在原地，想起一句老话：人这一生，拉得顺也是拉，拉不顺也是拉，日子总得要过的。\n\n我闻了闻她送的香水，味道不张扬，但很好闻。\n\n啊，原来我不是，那个被冲走的人。";
+DOC += "\n" + DESK_REWARD;
+
 /* 字幕以 town.html 的 .vt-set 为源，修改时同步两处。
    独立省略号保留为停顿，游戏厅跨行句保留原行序。 */
 var SUBS = [
@@ -392,11 +394,8 @@ var SUBS = [
   ["游戏厅", ["在现实中总是难以经历太多", "功利、条件约束了想法",
               "而在与此不同的另一处地方",
               "我们可以亲验数辈子的故事，去经历", "失败，然后按下继续"]],
-  ["调度室", ["港口不是一条流水线", "每一次等待都会改写全局顺序",
-              "岸桥、泊位与潮窗要一起排", "把局部最优让给整船准点",
-              "调度室，开始推演"]],
-  ["联系方式", ["门开了，路也走完了", "镇子外面还有话要说",
-                "留两个地方给你找我", "微信 · QQ", "按一下继续"]],
+  ["调度室", ["港口不是一厢情愿的交往", "每一次取舍都会暗中埋藏", "谁能算尽，而非迷汤", "台前，桌上", "调度室，推演开场"]],
+  ["联系方式", ["走尽了路，看遍了芳", "追寻了信号，又前去何方", "联系下情景，去做些联想", "不要告诉我，也不说原谅", "说一段故事，感谢捧场"]],
   ["打赢", ["……", "也就是说，大狗嚼赢了！",
             "大狗在BOSS被腰斩的身体中找到了入口",
             "“原来是入口啊，那不得不进去了”", "于是……"]],
@@ -708,6 +707,31 @@ FILES.forEach(function(f){
   iconEls[f.id] = frontEl.querySelector('.ic[data-id="' + f.id + '"]');
 });
 
+var hiddenIconReady = false;
+function syncHiddenIconWallpaper(){
+  var wallpaper = scrEl.querySelector('.xp');
+  if (!wallpaper.clientWidth || !wallpaper.clientHeight) return;
+  var icon = iconEls.contact.querySelector('.pg');
+  var patch = icon.querySelector('.icon-wallpaper');
+  if (!patch){
+    patch = document.createElement('div');
+    patch.className = 'xp icon-wallpaper';
+    patch.setAttribute('aria-hidden', 'true');
+    Array.prototype.forEach.call(wallpaper.querySelectorAll('.cl'), function(cloud){
+      patch.appendChild(cloud.cloneNode(true));
+    });
+    icon.appendChild(patch);
+  }
+  var x = 0, y = 0, node = icon;
+  while (node && node !== wallpaper){
+    x += node.offsetLeft; y += node.offsetTop; node = node.offsetParent;
+  }
+  patch.style.width = wallpaper.clientWidth + 'px';
+  patch.style.height = wallpaper.clientHeight + 'px';
+  patch.style.left = -x + 'px'; patch.style.top = -y + 'px';
+  hiddenIconReady = true;
+}
+
 function topZ(){ return ++Z; }
 
 /* 任务栏只列已开窗口；.on 对应未最小化且 z 最大的当前窗口。 */
@@ -737,6 +761,7 @@ function sync(id){
   }
   /* 桌面图标那个蓝底 = "它开着"。跟着状态走，不写死在 HTML 上 */
   iconEls[id].classList.toggle('on', s.open && !s.min);
+  if (id === 'contact' && hiddenIconReady) syncHiddenIconWallpaper();
   syncTask();
 }
 
@@ -1095,6 +1120,7 @@ function frame(now){
   camera.position.copy(camPos);
   camera.lookAt(camLook);
   renderer.render(scene, camera);
+  if (!hiddenIconReady) syncHiddenIconWallpaper();
 
   /* 几何普查：每 0.5 秒问一次"这几个点上站的是谁"。
      不敢每帧跑 —— `elementFromPoint` 会强制布局，而这页每帧主线程只有 ~2ms。 */

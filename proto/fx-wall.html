@@ -35,12 +35,23 @@
   #exit:hover{color:#ffdfe6;border-color:#8a2440}
   #exit:focus-visible{outline:2px solid #ffdfe6;outline-offset:3px}
   #exit:active::before{background:currentColor}
+#bossRecord{position:fixed;z-index:5;left:18px;bottom:18px;max-width:calc(100vw - 140px);padding:9px 12px;border:1px solid #734134;background:#160000dd;color:#efd2ad;font:12px/1.65 "Microsoft YaHei",sans-serif;pointer-events:none;white-space:pre-line}
+#bossRecord[hidden]{display:none}
+#bossChallengeControls{position:fixed;z-index:5;left:18px;bottom:18px;max-width:calc(100vw - 90px);pointer-events:none}
+#bossRecord{position:static;max-width:none}
+#bossFullChallenge{display:block;margin-top:8px;padding:8px 13px;border:1px solid #dfad72;background:#2b1208;color:#ffe2b7;font:12px "Microsoft YaHei",sans-serif;cursor:pointer;pointer-events:auto}
+#bossFullChallenge:hover{background:#492216}#bossFullChallenge[hidden]{display:none}
+#bossBests{position:fixed;z-index:5;left:18px;top:18px;margin:0;padding:9px 12px;border:1px solid #734134;background:#160000dd;color:#efd2ad;font:12px/1.7 "Microsoft YaHei",sans-serif;pointer-events:none;white-space:pre-line}
+#bossBests[hidden]{display:none}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
 <button id="exit" type="button" aria-label="退出游戏厅">退出</button>
 <div id="hud"></div>
+<aside id="bossBests" hidden></aside>
+<div id="bossChallengeControls"><aside id="bossRecord" hidden></aside><button id="bossFullChallenge" hidden>挑战满加强</button></div>
+<script src="boss-progress.js"></script>
 <script>
 "use strict";
 /* 探针规矩：出图脚本一律先挂 window.__errs。这里自己也挂一份。 */
@@ -530,6 +541,33 @@ var PHOTOS = ["去月球", "逃离鸭科夫", "战地风云6", "不_存在的你
   "sinisistar2", "塞雷卡2", "多娜多娜", "兰斯", "野猫", "蜉蝣", "驱动妖精",
   "一次性交易大师", "特工17", "永恒世界", "凤凰"];
 /* 可点击照片表：PHOTOS 名称映射到完整 URL；链接去掉 spm_id_from/vd_source 等分享跟踪参数。 */
+var BOSS_CARD_NAME = "大狗嚼 · Boss战";
+var BOSS_CLEARED = Q.get("bossCleared") === "1";
+if (!BOSS_CLEARED && window.parent === window){
+  try { BOSS_CLEARED = localStorage.getItem("s7eventeen.bossCleared.v1") === "1"; } catch (e) {}
+}
+var WALL_BOSS_PROGRESS = BossProgress.fromParams(Q, BossProgress.read());
+if (BOSS_CLEARED){
+  PHOTOS.push(BOSS_CARD_NAME);
+  var bests=BossProgress.bests(WALL_BOSS_PROGRESS),bestLines=[];
+  if(bests[3]!==null)bestLines.push("加强Ⅲ最快 · "+BossProgress.time(bests[3]));
+  if(bests[4]!==null)bestLines.push("满加强最快 · "+BossProgress.time(bests[4]));
+  var bestPanel=document.getElementById("bossBests");
+  bestPanel.hidden=bestLines.length===0;bestPanel.textContent=bestLines.join("\n");
+  var lastClear = WALL_BOSS_PROGRESS.records[WALL_BOSS_PROGRESS.records.length - 1];
+  var bossRecord = document.getElementById("bossRecord");
+  bossRecord.hidden = false;
+  bossRecord.textContent = "下次挑战 · " + BossProgress.label(WALL_BOSS_PROGRESS.level)
+    + (lastClear ? "\n最近通关 · " + BossProgress.label(lastClear.level) + " BOSS · " + BossProgress.time(lastClear.seconds) : "")
+    + (!WALL_BOSS_PROGRESS.fullUnlocked && WALL_BOSS_PROGRESS.level === 3 ? "\n加强Ⅲ 15秒内通关 · 解锁满加强" : "");
+  var fullButton = document.getElementById("bossFullChallenge");
+  fullButton.hidden = !WALL_BOSS_PROGRESS.fullUnlocked;
+  fullButton.addEventListener("click", function(){
+    if(GATE || !armed || !WALL_BOSS_PROGRESS.fullUnlocked)return;
+    if(window.parent!==window)window.parent.postMessage({what:"arcade-boss-replay",full:true},"*");
+    else location.assign("boss.html?replay=1&level=4"+BossProgress.params(WALL_BOSS_PROGRESS));
+  });
+}
 var LINKS = {
   "ZATO": "https://www.bilibili.com/video/BV1ZkvUBDEMM/"
 };
@@ -542,7 +580,7 @@ var CARD = [], nLoaded = 0, nFail = 0;
     o.im.onload  = function(){ nLoaded++; };
     o.im.onerror = function(){ nFail++; window.__errs.push("图加载失败 " + this.src); };
     /* 序号文件名（文件名里带中文会给 URL 编码添乱，编号最省事） */
-    o.im.src = WALLDIR + ("0" + (i + 1)).slice(-2) + ".webp";
+    o.im.src = WALLDIR + (o.name === BOSS_CARD_NAME ? "boss-battle.webp" : ("0" + (i + 1)).slice(-2) + ".webp");
     CARD.push(o);
   }
 })();
@@ -609,7 +647,7 @@ function buildCards(){
     o.u  = left + o.wu/2;              // o.u 是中心
     left += o.wu + GAP;
   }
-  PERIOD = left; // 完整 33 张 + 33 个 gap，包括末张→下一轮首张。
+  PERIOD = left; // 完整一轮卡片和间隔，包括末张到下一轮首张。
   if (anchor){
     T.iu = anchor.u - CARD[anchor.sourceIndex].u - anchor.cycle*PERIOD;
   } else { T.iu = -CARD[0].u; } // 第一个源图从中心出发，加载重排按锚点继承。
@@ -729,7 +767,7 @@ function refreshCursor(){
      其余 ⇒ 清掉，回到 `#cv{cursor:grab}`。 */
   if (wall.drag){ cv.style.cursor = ""; return; }
   var c = (T0 !== null) ? cardAt(mx, my) : null;
-  cv.style.cursor = (padHot() || (c && LINKS[c.name])) ? "pointer" : "";
+  cv.style.cursor = (padHot() || (c && (LINKS[c.name] || c.name === BOSS_CARD_NAME))) ? "pointer" : "";
 }
 
 cv.addEventListener("pointerdown", function(e){
@@ -786,6 +824,12 @@ function wallUp(e){
        点没链接的照片 / 空白处：什么都不做 —— 原来会落到末尾那句 `replay()`，
        而它在入场后是空操作（见 replay 的第一行守卫）。 */
     var c = e && cardAt(e.clientX, e.clientY);
+    if (c && c.name === BOSS_CARD_NAME){
+      if (!BOSS_CLEARED || !interactive()) return;
+      if (window.parent !== window) wellSay("arcade-boss-replay");
+      else location.assign("boss.html?replay=1&level="+WALL_BOSS_PROGRESS.level+BossProgress.params(WALL_BOSS_PROGRESS));
+      return;
+    }
     if (c && LINKS[c.name]){ openLink(LINKS[c.name]); return; }
   }
   replay();

@@ -11,6 +11,23 @@ body{display:grid;place-items:center}canvas{display:block;width:100%;height:100%
 #dogLayer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
 #game{position:fixed;inset:0;z-index:1}
 #hud{position:fixed;z-index:3;left:18px;top:16px;right:18px;display:flex;justify-content:space-between;gap:12px;pointer-events:none;font:12px ui-monospace,Consolas,monospace;color:#c8d5e4;text-shadow:0 2px 8px #000}
+.health{display:flex;gap:3px;align-items:center}
+.heart{position:relative;display:inline-block;color:#472431;font:24px/1.15 "Segoe UI Symbol",sans-serif;filter:drop-shadow(0 1px 3px #0008)}
+.heart-fill{position:absolute;left:0;top:0;overflow:hidden;color:#ff4d69;white-space:nowrap;width:100%}
+#battleClock{display:block;margin-top:5px;font-size:11px;color:#b8aab3;font-variant-numeric:tabular-nums}
+#bossPanel{width:min(42vw,270px)}.boss-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}
+#bossRank{color:#ffd29b;letter-spacing:.12em}#bossRank:empty{display:none}
+#bossHp{height:11px;border:1px solid #c47a8b;background:#25131e;padding:2px;box-shadow:0 2px 9px #0007}
+#bossFill{height:100%;width:100%;background:linear-gradient(90deg,#bf2448,#ff647d);transform-origin:left center;transition:transform .12s linear}
+#bossValue{display:block;text-align:right;margin-top:4px;font-size:10px;color:#be9ca8}
+#bestRecords{margin-top:9px;color:#f4d1a3;font:11px/1.7 "Microsoft YaHei",sans-serif;white-space:pre-line}
+#bestRecords[hidden],#bossModes[hidden]{display:none}
+#bossModes{display:flex;gap:6px;margin-top:8px;pointer-events:auto}
+#bossModes button{padding:5px 7px;border:1px solid #8e7160;background:#17131ee8;color:#edcda8;font:11px "Microsoft YaHei",sans-serif}
+#bossModes button:disabled{opacity:.4;cursor:default}
+#bossStock{display:block;margin-top:5px;text-align:right;color:#ffd39d;font-size:10px}
+#bossStock[hidden]{display:none}.actions{flex-wrap:wrap}
+#clearRecord{color:#ffd39d!important;font-variant-numeric:tabular-nums}
 #hint{position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);max-width:540px;padding:18px 22px;border:1px solid #586273;background:#0b0e15e8;text-align:center;line-height:1.7;transition:opacity .35s;pointer-events:none}
 #hint.hide{opacity:0}#touch{position:fixed;z-index:3;inset:auto 16px 16px;display:none;justify-content:space-between;pointer-events:none}
 #touch button{pointer-events:auto;width:54px;height:46px;border:1px solid #768297;background:#101621dd;color:#e8edf3;font-size:15px}
@@ -43,14 +60,23 @@ button{font:inherit;cursor:pointer}.actions{display:flex;justify-content:center;
 <body>
 <canvas id="game"></canvas>
 <svg id="dogLayer" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none"><g id="dogSprite"></g></svg>
-<div id="hud"><span id="hp">DOG 5 / 5</span><span id="bossHp">BOSS 12 / 12</span></div>
+<div id="hud"><div><div class="health" id="hp" role="img" aria-label="生命 5 / 5"><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart0">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart1">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart2">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart3">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart4">♥</span></span></div><time id="battleClock">00:00.00</time><div id="bestRecords" hidden></div><div id="bossModes" hidden><button id="switchThree">挑战加强Ⅲ</button><button id="switchFull">挑战满加强</button></div></div><div id="bossPanel"><div class="boss-heading"><span>BOSS</span><span id="bossRank"></span></div><div id="bossHp" role="progressbar" aria-label="Boss 生命" aria-valuemin="0" aria-valuemax="12" aria-valuenow="12"><div id="bossFill"></div></div><span id="bossValue">12 / 12</span><span id="bossStock" hidden></span></div></div>
 <div id="hint">WASD 移动，W 跳跃（在空中再按一次是二段跳）。鼠标左键发射剑气，右键冲刺闪避。躲开地图炮预警。<br>地形板能站上去，Boss 也会跳上来抢高度。</div>
 <div id="touch"><span><button data-key="KeyA">←</button><button data-key="KeyD">→</button></span><span><button data-key="KeyW">跳</button><button data-action="dash">闪</button><button data-action="attack">剑</button></span></div>
-<div id="result"><div class="box"><h2 id="resultTitle">战斗结束</h2><p id="resultText"></p><p class="stat" id="resultStat"></p><div class="actions"><button id="retry">再试一次</button><button id="next">前进</button></div></div></div>
+<div id="result"><div class="box"><h2 id="resultTitle">战斗结束</h2><p id="resultText"></p><p class="stat" id="resultStat"></p><p id="clearRecord" hidden></p><div class="actions"><button id="retry">再试一次</button><button id="fullChallenge" hidden>挑战满加强</button><button id="threeChallenge" hidden>挑战加强Ⅲ</button><button id="next">前进</button></div></div></div>
 <!-- 狗的画法，生成物，别手改 —— 由 `python scripts/sync-dog.py` 从 town.html 抽出。 -->
+<script src="boss-progress.js"></script>
 <script src="dog-flat.js"></script>
 <script>
 "use strict";
+var BOSS_QUERY=new URLSearchParams(location.search),REPLAY=BOSS_QUERY.get("replay")==="1";
+var BOSS_CONTEXT=BossProgress.fromParams(BOSS_QUERY,BossProgress.read());
+var BOSS_LEVEL=REPLAY?BossProgress.rank(BOSS_QUERY.get("level")||BOSS_CONTEXT.level):0;
+if(BOSS_LEVEL===4&&!BOSS_CONTEXT.fullUnlocked)BOSS_LEVEL=3;
+var MAX_STRENGTH=BOSS_LEVEL===4;
+var ROUND_ID=BOSS_QUERY.get("round")||"";
+var BOSS_DASH_SPEED=920*1.5,BOSS_DASH_TIME=.22;
+var JUMP_SPEED=700,DOUBLE_JUMP_SPEED=JUMP_SPEED*Math.sqrt(2/3),GRAVITY=1550;
 var REDUCE=matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NS="http://www.w3.org/2000/svg";
 function svgEl(n,at){var e=document.createElementNS(NS,n);for(var k in at)e.setAttribute(k,at[k]);return e}
@@ -69,7 +95,7 @@ var dog={x:180,y:0,vx:0,vy:0,w:42,h:42,hp:5,ground:false,face:1,attack:0,inv:0,d
 var FOE_FOOT=45;
 /* `vy/plat/ground` 是"脚"；`target/think/press/jumpCd` 是策略状态；
    `burst` 是剑气的三连发计数。 */
-var foe={x:0,y:0,vy:0,w:116,h:108,hp:12,phase:0,cool:1.6,skill:6.5,burst:1,hit:0,
+var foe={x:0,y:0,vy:0,w:116,h:108,hp:12,phase:0,cool:1.6,skill:6.5,burst:2,hit:0,inv:0,lungeCd:0,evadeCd:0,lungeCharges:MAX_STRENGTH?2:0,evadeCharges:MAX_STRENGTH?2:0,action:null,retreatT:0,
          mode:"stalk",target:-1,think:0,press:0,pressT:0,jumpCd:0,plat:0,ground:true,face:-1,kx:0,
          skip:-1,    /* 主动穿板下坠期间"这一帧别认这块板"，落地即清 */
          hopT:0};    /* 这一趟赶路走了多久 —— 超过 6 秒就认输换牌（兜底，见 foeMove） */
@@ -87,22 +113,19 @@ function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight
  foe.x=W-190;foe.plat=0;foe.vy=0;foe.ground=true;foe.y=(H-110)-FOE_FOOT;
  foe.skip=-1;foe.think=0;foe.target=-1;foe.mode="stalk";foe.press=0;foe.pressT=0;foe.jumpCd=0;foe.hopT=0;
  dog.y=H-110}addEventListener("resize",resize);resize();
-function say(x){parent!==window&&parent.postMessage({what:x},"*")}
+function say(x,extra){parent!==window&&parent.postMessage(Object.assign({what:x},extra||{}),"*")}
 function down(k){keys[k]=true}function up(k){keys[k]=false}
-addEventListener("keydown",function(e){if(["KeyA","KeyD","KeyW","KeyS","Space","KeyZ","Escape"].indexOf(e.code)>=0)e.preventDefault();if(e.code==="Escape")leaveGame();down(e.code)});addEventListener("keyup",function(e){up(e.code)});
+addEventListener("keydown",function(e){if(e.code!=="Escape"&&e.target&&e.target.closest&&e.target.closest("button"))return;if(["KeyA","KeyD","KeyW","KeyS","Space","KeyZ","Escape"].indexOf(e.code)>=0)e.preventDefault();if(e.code==="Escape")leaveGame();if(e.repeat&&(e.code==="KeyW"||e.code==="Space"))return;down(e.code)});addEventListener("keyup",function(e){up(e.code)});
 addEventListener("contextmenu",function(e){e.preventDefault()});/* 左键攻击、右键闪避。
    右键被上面这行 contextmenu 挡着，拿它当闪避不会弹菜单。 */
-addEventListener("mousedown",function(e){if(e.button===0)attack();if(e.button===2)dash()});
+addEventListener("mousedown",function(e){if(e.target&&e.target.closest&&e.target.closest("button"))return;if(e.button===0)attack();if(e.button===2)dash()});
 document.querySelectorAll("[data-key]").forEach(function(b){b.addEventListener("pointerdown",function(){down(b.dataset.key)});["pointerup","pointercancel","pointerleave"].forEach(function(e){b.addEventListener(e,function(){up(b.dataset.key)})})});
 document.querySelectorAll("[data-action]").forEach(function(b){b.addEventListener("pointerdown",function(){b.dataset.action==="dash"?dash():attack()})});
 function attack(){if(state!=="fight"||dog.attack>0)return;dog.attack=.28;slashes.push({x:dog.x+dog.face*34,y:dog.y-32,vx:dog.face*620,vy:0,life:.9,face:dog.face,r:13})}
-/* 起跳 -700（1550 重力下顶点 158px）。"能不能站上去"在跳力上就已经被卡死，
-   光修 land() 只解决一半 —— 三层地形就是照这个 158 设计的。 */
-/* 二段跳速度 -350，额外跳高约 39px，用于空中修正。
-   land() 重置 jumps，踩空离台后仍可补跳。 */
 function jump(){
-  if(dog.ground||dog.jumps===0){dog.vy=-700;dog.ground=false;dog.jumps=1;return}
-  if(dog.jumps<2){dog.vy=-350;dog.jumps=2}
+  if(state!=="fight")return;
+  if(dog.ground||dog.jumps===0){dog.vy=-JUMP_SPEED;dog.ground=false;dog.jumps=1;return}
+  if(dog.jumps<2){dog.vy=-DOUBLE_JUMP_SPEED;dog.jumps=2}
 }
 /* 冲刺是最好的脱离手段：它把 KB.t 清零 = 取消击退硬直。没有这条的话，挨一下
    之后那 0.38 秒就是"看着自己被推走"，连锁挨打没有翻盘手段。 */
@@ -110,31 +133,121 @@ function dash(){if(state!=="fight"||dog.dash>0||dog.dashCd>0)return;dog.dash=.22
 /* 打击感三件套：顿帧 + 击退 + 火花，缺一样打上去就像按了个开关。
    `dir` 是击退方向（= 攻击来向的反面），不是攻击来向。 */
 function burst(x,y,dir,col){for(var i=0;i<12;i++)sparks.push({x:x,y:y,vx:dir*(90+Math.random()*520),vy:(Math.random()-.5)*520,life:.16+Math.random()*.24,col:col})}
-function hitDog(dir){if(dog.inv>0)return;dog.hp--;dog.inv=1.0;shake=.34;hitStop=.085;
+function hitDog(dir,damage){if(state!=="fight"||dog.inv>0)return;dog.hp=Math.max(0,dog.hp-(damage===undefined?1:damage));dog.inv=1.0;shake=.34;hitStop=.085;
  /* 击退 = 冲量 + 指数衰减，不是每帧乘固定比例 —— `v*=.88` 那种写法帧率一变
     击退距离就变。总位移 ≈ v/K = 620/7.5 ≈ 83px。 */
  KB.t=.38;KB.vx=dir*620;if(dog.ground)dog.vy=-170;
  burst(dog.x-dir*14,dog.y-30,dir,"#ffd9e2");if(dog.hp<=0)finish(false)}
-function hitBoss(dir){if(foe.hit>0)return;foe.hp--;foe.hit=.18;shake=.2;hitStop=.055;foe.kx=dir*520;
+function hitBoss(dir){if(state!=="fight"||foe.hit>0||foe.inv>0)return;foe.hp=Math.max(0,foe.hp-1);foe.hit=.18;shake=.2;hitStop=.055;foe.kx=dir*520;
  burst(foe.x-dir*34,foe.y-42,dir,"#dff8ff");if(foe.hp<=0)finish(true)}
 /* 结算文案和配色取 foe.phase；父页保留 BOSS_HOLD，再由前进按钮或超时进入字幕。 */
-function finish(win){if(state!=="fight")return;state=win?"won":"lost";cancelAnimationFrame(raf);
+var battleStart = performance.now(), battleEnd = null, hudHP = -1, hudBossHP = -1;
+function battleSeconds(){ return Math.max(0, ((battleEnd === null ? performance.now() : battleEnd) - battleStart) / 1000); }
+function syncBattleHud(){
+  if (hudHP !== dog.hp){
+    hudHP = dog.hp;
+    for (var i = 0; i < 5; i++) document.getElementById("heart" + i).style.width = Math.max(0, Math.min(1, dog.hp - i)) * 100 + "%";
+    document.getElementById("hp").setAttribute("aria-label", "生命 " + dog.hp + " / 5");
+  }
+  if (hudBossHP !== foe.hp){
+    hudBossHP = foe.hp;
+    document.getElementById("bossFill").style.transform = "scaleX(" + Math.max(0, Math.min(1, foe.hp / 12)) + ")";
+    document.getElementById("bossHp").setAttribute("aria-valuenow", String(Math.max(0, foe.hp)));
+    document.getElementById("bossValue").textContent = Math.max(0, foe.hp) + " / 12";
+  }
+  document.getElementById("battleClock").textContent = BossProgress.time(battleSeconds());
+  if(MAX_STRENGTH){
+    document.getElementById("bossStock").hidden=false;
+    document.getElementById("bossStock").textContent="扇斩 "+foe.lungeCharges+"/2 · 闪避 "+foe.evadeCharges+"/2";
+  }
+}
+function canUseFoeAbility(kind){
+  return MAX_STRENGTH ? foe[kind + "Charges"] > 0 : foe[kind + "Cd"] <= 0;
+}
+function spendFoeAbility(kind){
+  if (MAX_STRENGTH){
+    foe[kind + "Charges"]--;
+    if (foe[kind + "Cd"] <= 0) foe[kind + "Cd"] = 4;
+  } else foe[kind + "Cd"] = kind === "lunge" ? 12 : 6;
+}
+function updateFoeCooldowns(dt){
+  ["lunge", "evade"].forEach(function(kind){
+    var cd = kind + "Cd", stock = kind + "Charges";
+    if (!MAX_STRENGTH){ foe[cd] = Math.max(0, foe[cd] - dt); return; }
+    if (foe[stock] >= 2){ foe[stock] = 2; foe[cd] = 0; return; }
+    foe[cd] -= dt;
+    while (foe[cd] <= 1e-7 && foe[stock] < 2){
+      foe[stock]++;
+      foe[cd] = foe[stock] < 2 ? foe[cd] + 4 : 0;
+    }
+  });
+}
+function renderBestRecords(){
+  var bests=BossProgress.bests(BOSS_CONTEXT),lines=[];
+  if(REPLAY&&bests[3]!==null)lines.push("加强Ⅲ最快 · "+BossProgress.time(bests[3]));
+  if(REPLAY&&bests[4]!==null)lines.push("满加强最快 · "+BossProgress.time(bests[4]));
+  document.getElementById("bestRecords").hidden=lines.length===0;
+  document.getElementById("bestRecords").textContent=lines.join("\n");
+  document.getElementById("bossModes").hidden=!(REPLAY&&BOSS_CONTEXT.fullUnlocked);
+  document.getElementById("switchThree").disabled=BOSS_LEVEL===3;
+  document.getElementById("switchFull").disabled=MAX_STRENGTH;
+}
+function startThirdChallenge(){
+  if(!REPLAY||!BOSS_CONTEXT.fullUnlocked)return;
+  if(parent!==window){say("boss-replay-three");return}
+  location.assign("boss.html?replay=1&level=3"+BossProgress.params(BOSS_CONTEXT));
+}
+function startFullChallenge(){
+  if (!REPLAY || !BOSS_CONTEXT.fullUnlocked) return;
+  if (parent !== window){ say("boss-replay-full"); return; }
+  location.assign("boss.html?replay=1&level=4" + BossProgress.params(BOSS_CONTEXT));
+}
+
+function retryFight(){
+  if (!REPLAY){ location.reload(); return; }
+  if (parent !== window){ say("boss-replay-retry"); return; }
+  var next = MAX_STRENGTH ? 4 : (state === "won" ? Math.min(3, BOSS_LEVEL + 1) : BOSS_LEVEL);
+  location.assign("boss.html?replay=1&level=" + next + BossProgress.params(BOSS_CONTEXT));
+}
+
+function finish(win){if(state!=="fight")return;battleEnd=performance.now();state=win?"won":"lost";cancelAnimationFrame(raf);syncBattleHud();
  var box=document.getElementById("result");
  box.classList.add("on");box.classList.toggle("blue",foe.phase>0);
  document.getElementById("resultTitle").textContent=win?"信号通道已清空":"声波被打断了";
  document.getElementById("resultText").textContent=win?"前方的黑影碎开了。"
    :(foe.phase>0?"世界翻了个面，它还是比你快。":"它还没换过色，你就被压住了。");
  document.getElementById("resultStat").textContent=win?("自身剩余 "+dog.hp+" / 5"):("BOSS 剩余 "+foe.hp+" / 12");
- document.getElementById("retry").style.display=win?"none":"inline-block";
+ document.getElementById("retry").style.display=win&&!REPLAY?"none":"inline-block";
  /* 赢和输，同一颗按钮说两句话：赢=「前进」（进字幕），输=「离开」（回镇上）。 */
- document.getElementById("next").textContent=win?"前进":"离开";
- say(win?"boss-won":"boss-lost")}
+ document.getElementById("next").textContent=REPLAY?"返回游戏厅":(win?"前进":"离开");
+ var seconds=battleSeconds(),record=document.getElementById("clearRecord");
+  record.hidden=!(REPLAY&&win);
+  if(REPLAY&&win){
+    record.textContent="本次记录 · "+BossProgress.time(seconds)+" 击败"+BossProgress.label(BOSS_LEVEL)+" BOSS";
+    document.getElementById("retry").textContent="挑战"+BossProgress.label(MAX_STRENGTH?4:Math.min(3,BOSS_LEVEL+1));
+    var wasUnlocked=BOSS_CONTEXT.fullUnlocked;
+    BOSS_CONTEXT=BossProgress.victory(BOSS_CONTEXT,BOSS_LEVEL,seconds);
+    if(!wasUnlocked&&BOSS_CONTEXT.fullUnlocked)record.textContent+=" · 满加强已解锁";
+    if(parent===window)BossProgress.save(BOSS_CONTEXT);
+    else say("boss-replay-won",{level:BOSS_LEVEL,seconds:seconds,round:ROUND_ID});
+  }
+  renderBestRecords();
+  document.getElementById("threeChallenge").hidden=!(REPLAY&&BOSS_CONTEXT.fullUnlocked&&BOSS_LEVEL!==3);
+  document.getElementById("fullChallenge").hidden=!(REPLAY&&BOSS_CONTEXT.fullUnlocked&&!MAX_STRENGTH);
+  if(!REPLAY)say(win?"boss-won":"boss-lost")}
 /* 按钮 id 避免使用 leave，以免覆盖 window.leave。
    失败发送 well-exit 返回小镇，胜利发送 boss-next 进入字幕。 */
-function goNext(){ say(state==="won"?"boss-next":"well-exit") }
+function goNext(){ if(REPLAY){leaveGame();return}say(state==="won"?"boss-next":"well-exit") }
 /* Esc 和父页发来的 `well-esc` 都是"退出"，走这一条。 */
-function leaveGame(){ say("well-exit") }
-document.getElementById("retry").onclick=function(){location.reload()};
+function leaveGame(){
+ if(REPLAY){if(parent===window)location.assign("fx-wall.html?bossCleared=1"+BossProgress.params(BOSS_CONTEXT));else say("boss-replay-exit");return}
+ say("well-exit")
+}
+document.getElementById("retry").onclick=retryFight;
+document.getElementById("fullChallenge").onclick=startFullChallenge;
+document.getElementById("threeChallenge").onclick=startThirdChallenge;
+document.getElementById("switchThree").onclick=startThirdChallenge;
+document.getElementById("switchFull").onclick=startFullChallenge;
 document.getElementById("next").onclick=goNext;
 /* 色调不绑血量，绑"它放没放过地图炮"（见 spawnSkill）：只有两态（红黑 / 深蓝淡蓝），
    第一次放技能就转，转完不再回退。 */
@@ -175,7 +288,9 @@ function canHop(a,b){
  return Math.max(0,Math.max(A.x-B.x-B.w,B.x-A.x-A.w))<=AIR;
 }
 function foeThink(){
- var pPlat=underPlat(dog.x,dog.y);
+  if(foe.retreatT>0){foe.mode="retreat";foe.target=-1;foe.think=.2;return}
+  if(foe.mode==="retreat")foe.mode="stalk";
+  var pPlat=underPlat(dog.x,dog.y);
  /* ① 正在压：按表压满 pressT 再退，中途不重新决策。 */
  if(foe.mode==="press"){
   if(foe.pressT>0){foe.think=.6;return}
@@ -202,8 +317,164 @@ function foeThink(){
  if(best>=0){foe.mode="hop";foe.target=best;foe.think=1.0;return}
  foe.think=.9;
 }
+function slashReach(){
+  var board = platforms[foe.plat > 0 ? foe.plat : 1];
+  return (board ? board.w : Math.max(64, Math.min(W * .13, 190))) * 2 / 3;
+}
+function foePhysics(dt){
+  var oldFeet = foeFeet();
+  foe.vy += GRAVITY * dt; foe.y += foe.vy * dt;
+  var r = landAt(foe.x, foe.w * .34, oldFeet, foeFeet(), foe.vy, foe.skip);
+  foe.ground = false;
+  if (r.hit){
+    foe.y = r.y - FOE_FOOT; foe.vy = 0; foe.ground = true; foe.skip = -1;
+    if (r.plat !== foe.plat){ foe.plat = r.plat; foe.think = Math.min(foe.think, .35); }
+  }
+  foe.kx *= Math.exp(-9 * dt);
+  foe.x = Math.max(70, Math.min(W - 70, foe.x + foe.kx * dt));
+}
+function startFoeLunge(){
+  if (BOSS_LEVEL < 1 || !canUseFoeAbility("lunge") || foe.action || foe.retreatT > 0) return false;
+  var reach = slashReach(), dx = dog.x - foe.x, dy = dog.y - 26 - foe.y;
+  if (Math.abs(dx) > BOSS_DASH_SPEED * BOSS_DASH_TIME + reach || Math.abs(dy) > reach * .8) return false;
+  var face = dx < 0 ? -1 : 1;
+  var travel = Math.min(BOSS_DASH_SPEED * BOSS_DASH_TIME, Math.max(0, Math.abs(dx) - reach * .55));
+  foe.face = face; spendFoeAbility("lunge"); foe.kx = 0;
+  foe.action = {kind:"windup", left:.24, face:face, reach:reach,
+    target:Math.max(70, Math.min(W - 70, foe.x + face * travel))};
+  return true;
+}
+function startFoeEvade(){
+  if (BOSS_LEVEL < 3 || !canUseFoeAbility("evade") || foe.action) return false;
+  var threat = null;
+  for (var i = 0; i < slashes.length; i++){
+    var q = slashes[i];
+    if (!q.enemy && (foe.x - q.x) * q.vx > 0 && Math.abs(q.x - foe.x) < 200
+        && Math.abs(q.y - (foe.y - 42)) < foe.h * .6){ threat = q; break; }
+  }
+  if (!threat) return false;
+  var face = threat.vx > 0 ? 1 : -1;
+  if (foe.x + face * BOSS_DASH_SPEED * BOSS_DASH_TIME < 70 || foe.x + face * BOSS_DASH_SPEED * BOSS_DASH_TIME > W - 70) face = -face;
+  spendFoeAbility("evade"); foe.inv = .32; foe.kx = 0;
+  foe.action = {kind:"evade", left:BOSS_DASH_TIME, face:face};
+  return true;
+}
+function slashHitsDog(action){
+  var dx = (dog.x - foe.x) * action.face, dy = dog.y - 26 - foe.y;
+  return Math.hypot(dx, dy) <= action.reach + dog.w * .2
+    && Math.abs(Math.atan2(dy, dx)) <= Math.PI / 3;
+}
+function stepFoeAction(dt){
+  if (!foe.action){ startFoeEvade() || startFoeLunge(); }
+  var a = foe.action;
+  if (!a) return false;
+  var activeDt = Math.min(dt, a.left);
+  a.left = Math.max(0, a.left - dt);
+  if (a.left < 1e-6) a.left = 0;
+  if (a.kind === "windup"){
+    if (a.left <= 0){ a.kind = "lunge"; a.left = BOSS_DASH_TIME; foe.inv = .32; }
+  } else if (a.kind === "lunge"){
+    var dist = a.target - foe.x;
+    foe.x += Math.sign(dist) * Math.min(Math.abs(dist), BOSS_DASH_SPEED * activeDt);
+    if (a.left <= 0 || Math.abs(a.target - foe.x) < .5){ a.kind = "slash"; a.left = .26; a.hit = false; }
+  } else if (a.kind === "slash"){
+    if (!a.hit && slashHitsDog(a)){ a.hit = true; hitDog(a.face, 1.5); }
+    if (a.left <= 0){
+      foe.action = null; foe.retreatT = 2.4; foe.mode = "retreat";
+      foe.target = -1; foe.pressT = 0; foe.think = 0;
+    }
+  } else if (a.kind === "evade"){
+    foe.x = Math.max(70, Math.min(W - 70, foe.x + a.face * BOSS_DASH_SPEED * activeDt));
+    if (a.left <= 0) foe.action = null;
+  }
+  return true;
+}
+function drawFoeAction(){
+  var a = foe.action;
+  if (!a) return;
+  ctx.save(); ctx.translate(foe.x, foe.y); ctx.scale(a.face, 1);
+  var color = foe.phase ? "#83dfff" : "#ff658c", core = "#fff6df";
+  if (a.kind === "windup"){
+    ctx.globalAlpha = .09; ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, a.reach, -Math.PI / 3, Math.PI / 3); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = .55; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(0, 0, a.reach, -Math.PI / 3, Math.PI / 3); ctx.stroke();
+  } else if (a.kind === "slash"){
+    var progress = Math.max(0, Math.min(1, 1 - a.left / .26));
+    var flash = Math.sin(Math.PI * Math.pow(progress, .55));
+    var radius = a.reach, start = -Math.PI / 3, end = Math.PI / 3;
+    ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+    var crescent = ctx.createRadialGradient(0, 0, radius * .48, 0, 0, radius);
+    crescent.addColorStop(0, "transparent"); crescent.addColorStop(.56, color);
+    crescent.addColorStop(.9, core); crescent.addColorStop(1, color);
+    ctx.fillStyle = crescent; ctx.globalAlpha = .38 + flash * .4;
+    ctx.shadowColor = color; ctx.shadowBlur = REDUCE ? 8 : 22;
+    ctx.beginPath(); ctx.arc(0, 0, radius, start, end);
+    ctx.quadraticCurveTo(radius * 1.1, 0, Math.cos(start) * radius, Math.sin(start) * radius); ctx.closePath(); ctx.fill();
+    for (var trail = 3; trail >= 0; trail--){
+      ctx.globalAlpha = (.12 + flash * .14) * (1 - trail * .15);
+      ctx.strokeStyle = color; ctx.lineWidth = 7 - trail;
+      ctx.beginPath(); ctx.arc(0, 0, radius * (1 - trail * .075), start, end); ctx.stroke();
+    }
+    ctx.globalAlpha = .65 + flash * .35; ctx.shadowBlur = 8;
+    ctx.strokeStyle = core; ctx.lineWidth = 2.6 + flash * 1.8;
+    ctx.beginPath(); ctx.arc(0, 0, radius * .99, start, end); ctx.stroke();
+    var blade = start + (end - start) * (1 - Math.pow(1 - progress, 3));
+    ctx.lineWidth = 2.2; ctx.beginPath();
+    ctx.moveTo(Math.cos(blade) * radius * .3, Math.sin(blade) * radius * .3);
+    ctx.lineTo(Math.cos(blade) * radius, Math.sin(blade) * radius); ctx.stroke();
+    for (var i = 0; i < 8; i++){
+      var angle = start + (end - start) * (i + .5) / 8;
+      var tip = radius * (.9 + Math.sin(i * 2.4 + progress * 4) * .07);
+      ctx.globalAlpha = flash * (.25 + (i % 3) * .17); ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(Math.cos(angle) * tip * .76, Math.sin(angle) * tip * .76);
+      ctx.lineTo(Math.cos(angle) * tip, Math.sin(angle) * tip); ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = color;
+    for (var j = 1; j <= 4; j++){
+      ctx.globalAlpha = .2 / j; ctx.fillRect(-j * 35 - 45, -76, 90, 115);
+    }
+  }
+  ctx.restore();
+}
+
+
+function bounceSpecialShot(q){
+  var px = Math.min(18, W / 4), py = Math.min(18, H / 4);
+  while (q.x < px || q.x > W - px){
+    if (q.x < px){ q.x = 2 * px - q.x; q.vx = Math.abs(q.vx); }
+    else { q.x = 2 * (W - px) - q.x; q.vx = -Math.abs(q.vx); }
+  }
+  while (q.y < py || q.y > H - py){
+    if (q.y < py){ q.y = 2 * py - q.y; q.vy = Math.abs(q.vy); }
+    else { q.y = 2 * (H - py) - q.y; q.vy = -Math.abs(q.vy); }
+  }
+  q.face = q.vx < 0 ? -1 : 1;
+}
+function stepShots(dt){
+  for (var i = slashes.length - 1; i >= 0; i--){
+    var q = slashes[i];
+    q.x += q.vx * dt; q.y += q.vy * dt; q.age = (q.age || 0) + dt;
+    if (q.special){ bounceSpecialShot(q); }
+    else {
+      q.life -= dt; q.r += 90 * dt;
+      if (q.life <= 0 || q.x < 0 || q.x > W || q.y < 0 || q.y > H){ slashes.splice(i, 1); continue; }
+    }
+    if (!q.enemy && Math.abs(q.x - foe.x) < foe.w * .62 && Math.abs(q.y - (foe.y - 42)) < foe.h * .58){
+      hitBoss(q.face); slashes.splice(i, 1); continue;
+    }
+    if (q.enemy && Math.hypot(q.x - dog.x, q.y - (dog.y - 30)) < 32){
+      if (q.special && dog.inv > 0) continue;
+      hitDog(q.vx < 0 ? -1 : 1); slashes.splice(i, 1);
+    }
+  }
+}
+
+
 function foeMove(dt){
- foe.think-=dt;foe.press=Math.max(0,foe.press-dt);foe.pressT=Math.max(0,foe.pressT-dt);
+  if(stepFoeAction(dt)){foePhysics(dt);return}
+  foe.think-=dt;foe.press=Math.max(0,foe.press-dt);foe.pressT=Math.max(0,foe.pressT-dt);
  foe.jumpCd=Math.max(0,foe.jumpCd-dt);
  if(foe.think<=0)foeThink();
  /* 兜底：`canHop` 说得到、实际却到不了（版面改了，或又冒出个没料到的边界），
@@ -220,7 +491,8 @@ function foeMove(dt){
  /* 三档目标：已经在玩家那块板上才贴上去；否则先奔目标板。 */
  var tx=(foe.mode==="press"&&foe.plat===ti)?dog.x+(foe.x<dog.x?-92:92)
        :(tp?(down?platCX(ti):ax):dog.x+(foe.x<dog.x?-330:330));
- /* 站在板上时一律夹在自己这块板内 —— 放开 x 让它自己走出板沿的话，掉到哪块全凭
+  if(foe.retreatT>0)tx=foe.x+(foe.x<dog.x?-470:470);
+  /* 站在板上时一律夹在自己这块板内 —— 放开 x 让它自己走出板沿的话，掉到哪块全凭
     运气，而心里认的还是原来那张牌。空中不夹，否则够不到侧面的板。 */
  if(foe.ground){var bp=platforms[foe.plat];tx=Math.max(bp.x+10,Math.min(bp.x+bp.w-10,tx))}
  /* 想上去就跳：横向得先对得差不多（<110px），不然会一头撞在板侧的空气上。
@@ -242,23 +514,14 @@ function foeMove(dt){
   }
  }
  /* 冲上去比走快。空中速度 150：96 的话横移只有 121px，够不到侧面的板。 */
- var spd=foe.mode==="press"?190:(foe.ground?140:150);
+ var spd=foe.retreatT>0?210:(foe.mode==="press"?190:(foe.ground?140:150));
  var d=tx-foe.x,stp=Math.min(Math.abs(d),spd*dt);
  if(stp>.5)foe.x+=Math.sign(d)*stp;
- var f0=foeFeet();
- foe.vy+=1550*dt;foe.y+=foe.vy*dt;
- var r=landAt(foe.x,foe.w*.34,f0,foeFeet(),foe.vy,foe.skip);
- foe.ground=false;
- if(r.hit){
-  foe.y=r.y-FOE_FOOT;foe.vy=0;foe.ground=true;foe.skip=-1;   /* 落地就撤销"别认这块板" */
-  if(r.plat!==foe.plat){foe.plat=r.plat;foe.think=Math.min(foe.think,.35)}   /* 换层了就重想 */
- }
- foe.kx*=Math.exp(-9*dt);
- foe.x=Math.max(70,Math.min(W-70,foe.x+foe.kx*dt));
+  foePhysics(dt);
 }
 /* 第一次地图炮更新 foe.phase；cut.done 保证只有首刀按扫描线切换世界配色。 */
 function spawnSkill(){skillN++;if(foe.phase===0)foe.phase=1;hazards.push({global:true,x:-W*.15,y:H*.46,w:W*1.3,h:22,life:1.12,delay:.42,progress:0,damageDone:false});warn=.72;shake=Math.max(shake,.28)}
-function update(dt){if(state!=="fight")return;t+=dt;dog.inv=Math.max(0,dog.inv-dt);dog.attack=Math.max(0,dog.attack-dt);dog.dash=Math.max(0,dog.dash-dt);dog.dashCd=Math.max(0,dog.dashCd-dt);foe.hit=Math.max(0,foe.hit-dt);shake=Math.max(0,shake-dt);
+function update(dt){if(state!=="fight")return;t+=dt;foe.inv=Math.max(0,foe.inv-dt);updateFoeCooldowns(dt);foe.retreatT=Math.max(0,foe.retreatT-dt);dog.inv=Math.max(0,dog.inv-dt);dog.attack=Math.max(0,dog.attack-dt);dog.dash=Math.max(0,dog.dash-dt);dog.dashCd=Math.max(0,dog.dashCd-dt);foe.hit=Math.max(0,foe.hit-dt);shake=Math.max(0,shake-dt);
  /* 方向：A 向左、D 向右。`dir` 同时也是 `dog.face`（正 = 朝右），和 `drawDog` 的
     `scale(face<0?-k:k, -k)`、攻击点 `x+face*34` 是同一套约定 —— 两处必须同号。 */
  var dir=(keys.KeyD?1:0)-(keys.KeyA?1:0);
@@ -268,27 +531,29 @@ function update(dt){if(state!=="fight")return;t+=dt;dog.inv=Math.max(0,dog.inv-d
  else if(!dog.dash){dog.vx+=(dir*900-dog.vx*8)*dt;if(dir)dog.face=dir}
  dog.x=Math.max(34,Math.min(W-34,dog.x+dog.vx*dt));
  dog.run+=Math.abs(dog.vx)*dt*.035;if((keys.KeyW||keys.Space)){keys.KeyW=false;keys.Space=false;jump()}if(keys.KeyZ){keys.KeyZ=false;attack()}if(keys.KeyS&&dog.ground){dog.vx*=.8}
- var y0=dog.y;dog.vy+=1550*dt;dog.y+=dog.vy*dt;land(y0);
+ var y0=dog.y;dog.vy+=GRAVITY*dt;dog.y+=dog.vy*dt;land(y0);
  if(dog.dash<=0&&KB.t<=0&&Math.abs(dog.vx)>500)dog.vx*=.88;   /* 别去阻尼击退，KB 自己会衰 */
- for(var i=slashes.length-1;i>=0;i--){var q=slashes[i];q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt;q.r+=90*dt;if(q.life<=0||q.x<0||q.x>W||q.y<0||q.y>H){slashes.splice(i,1);continue}if(!q.enemy&&Math.abs(q.x-foe.x)<foe.w*.62&&Math.abs(q.y-(foe.y-42))<foe.h*.58){hitBoss(q.face);slashes.splice(i,1);continue}if(q.enemy&&Math.hypot(q.x-dog.x,q.y-(dog.y-30))<32){hitDog(q.vx<0?-1:1);slashes.splice(i,1)}}
+ foeMove(dt);
+ stepShots(dt);
  /* 地图炮在刀线扫到玩家时判伤，击退方向与刀一致；可用冲刺无敌帧穿过。 */
  for(var j=hazards.length-1;j>=0;j--){var h=hazards[j];h.delay-=dt;if(h.delay<=0){h.life-=dt;if(h.global){h.progress=Math.min(1,h.progress+dt/.58);var lx=h.x+h.w*h.progress;if(!h.damageDone&&Math.abs(lx-dog.x)<26){if(dog.inv<=0)hitDog(1);h.damageDone=true}}}if(h.life<=0){hazards.splice(j,1)}}
  /* 剑气三连发：连斩间隔 .34s，组间停 3.4/2.8s。
      地图炮间隔 9/6s，仅站在地面时发动，保证预警与 Boss 位置一致。 */
- foeMove(dt);foe.cool-=dt;foe.skill-=dt;
- if(foe.cool<=0){
-  var mx=foe.x+foe.face*54,my=foe.y-48,ax=dog.x-mx,ay=(dog.y-30)-my,L=Math.hypot(ax,ay)||1,SP=470;
-  slashes.push({x:mx,y:my,vx:ax/L*SP,vy:ay/L*SP,life:1.7,face:foe.face,r:10,enemy:true});slashN++;
-  if(foe.burst>0){foe.burst--;foe.cool=.34}else{foe.burst=1;foe.cool=foe.phase?2.8:3.4}
+ if(state!=="fight")return;
+ foe.cool-=dt;foe.skill-=dt;
+ if(foe.cool<=0&&!foe.action){
+  var mx=foe.x+foe.face*54,my=foe.y-48,ax=dog.x-mx,ay=(dog.y-30)-my,L=Math.hypot(ax,ay)||1,SP=470*(BOSS_LEVEL>=2?1.3:1);
+  slashes.push({x:mx,y:my,vx:ax/L*SP,vy:ay/L*SP,life:1.7,face:foe.face,r:10,enemy:true,special:BOSS_LEVEL>=2&&foe.burst===1});slashN++;
+  if(foe.burst>0){foe.burst--;foe.cool=.34}else{foe.burst=2;foe.cool=foe.phase?2.8:3.4}
  }
- if(foe.skill<=0&&foe.ground){foe.skill=foe.phase?6.0:9.0;spawnSkill()}
+ if(foe.skill<=0&&foe.ground&&!foe.action){foe.skill=foe.phase?6.0:9.0;spawnSkill()}
  for(var si=sparks.length-1;si>=0;si--){var s=sparks[si];s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=900*dt;s.life-=dt;if(s.life<=0)sparks.splice(si,1)}
  /* spawnSkill() 先于色界更新，使 cut.on 与 phase 同帧切换。
      首帧 cut.x=-.15W 仍绘旧色；首刀结束后固定新色。 */
  var gz=null;for(var gi=0;gi<hazards.length;gi++)if(hazards[gi].global)gz=hazards[gi];
  if(gz){cut.x=gz.x+gz.w*gz.progress;if(!cut.done)cut.on=true}
  else if(cut.on){cut.on=false;cut.done=true}
- warn=Math.max(0,warn-dt);document.getElementById("hp").textContent="DOG "+dog.hp+" / 5";document.getElementById("bossHp").textContent="BOSS "+foe.hp+" / 12"}
+ warn=Math.max(0,warn-dt);syncBattleHud()}
 /* 一个色调下的整个世界：天空渐变 + 底台 + 浮台。
    抽成函数是为了画两遍（见 draw 的 seg）—— 不是特效，是分界线两边各画一次。 */
 function paintWorld(blue){
@@ -307,12 +572,31 @@ function draw(){var p=foe.phase;ctx.clearRect(0,0,W,H);
       ctx.save();ctx.beginPath();ctx.rect(seg,0,W-seg,H);ctx.clip();paintWorld(false);ctx.restore()}
  /* 那道缝本身：一条硬白线 + 外扩辉光，正好压在两种颜色的交界上。 */
  if(cut.on&&seg>0&&seg<W){ctx.save();ctx.globalAlpha=.85;ctx.fillStyle="#f2fdff";ctx.fillRect(seg-1.5,0,3,H);ctx.globalAlpha=.16;ctx.fillRect(seg-12,0,24,H);ctx.restore()}
- var sx=shake?Math.sin(t*90)*5:0;ctx.save();ctx.translate(sx,0);if(warn>0){ctx.fillStyle=p?"#82dcff":"#ef4d68";ctx.globalAlpha=.32;ctx.fillRect(0,H-112,W,4);ctx.globalAlpha=1}hazards.forEach(drawHazard);slashes.forEach(drawSlash);sparks.forEach(drawSpark);drawDog();drawBoss();ctx.restore()}
+ var sx=shake?Math.sin(t*90)*5:0;ctx.save();ctx.translate(sx,0);if(warn>0){ctx.fillStyle=p?"#82dcff":"#ef4d68";ctx.globalAlpha=.32;ctx.fillRect(0,H-112,W,4);ctx.globalAlpha=1}hazards.forEach(drawHazard);slashes.forEach(drawSlash);sparks.forEach(drawSpark);drawDog();drawFoeAction();drawBoss();ctx.restore()}
 /* place() 以地面为锚，pose.ph 使用圈数。仅落地时执行步态，冲刺 gait:false。 */
 function drawDog(){if(!dogVisual)return;if(dog.inv>0&&Math.floor(t*22)%2)return;dogVisual.place(dog.x,dog.y,dog.face);dogVisual.pose({ph:dog.run,gait:dog.ground&&!dog.dash});}
 function drawBoss(){var x=foe.x,y=foe.y,blue=foe.phase>0;ctx.save();ctx.translate(x,y);ctx.fillStyle=foe.hit>0?"#fff":(blue?"#315b86":"#712d52");ctx.beginPath();ctx.moveTo(-58,45);ctx.lineTo(-50,-55);ctx.lineTo(0,-94);ctx.lineTo(58,-55);ctx.lineTo(64,45);ctx.closePath();ctx.fill();ctx.fillStyle=blue?"#b8e8ff":"#f2c1ce";ctx.fillRect(-32,-35,18,7);ctx.fillRect(14,-35,18,7);ctx.restore()}
 function drawHazard(h){if(h.global){ctx.save();ctx.globalAlpha=h.delay>0?.28:.95;ctx.fillStyle=foe.phase?"#b8f2ff":"#ff526c";var x=h.x+h.w*h.progress;ctx.fillRect(x-22,0,44,H);ctx.globalAlpha=.34;ctx.fillRect(x-40,0,80,H);ctx.restore();return}ctx.save();ctx.translate(h.x,h.y);ctx.rotate(h.ang);ctx.globalAlpha=h.delay>0?.35:.9;ctx.strokeStyle=foe.phase?"#a7edff":"#ff526c";ctx.lineWidth=h.delay>0?3:8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(h.w,0);ctx.stroke();ctx.restore()}
-function drawSlash(q){ctx.save();ctx.translate(q.x,q.y);ctx.rotate(Math.atan2(q.vy,q.vx));ctx.strokeStyle=q.enemy?(foe.phase?"#9fe8ff":"#ff6078"):"#dff8ff";ctx.lineWidth=q.enemy?7:5;ctx.globalAlpha=Math.max(0,Math.min(1,q.life));ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(30,0);ctx.stroke();ctx.restore()}
+function drawSlash(q){
+  ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(Math.atan2(q.vy, q.vx));
+  if (q.special){
+    var pulse = .8 + Math.sin((q.age || 0) * 8) * .2;
+    ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+    ctx.shadowColor = "#ffc36b"; ctx.shadowBlur = REDUCE ? 7 : 18;
+    ctx.strokeStyle = "#ffbc5c"; ctx.lineWidth = 5; ctx.globalAlpha = .35;
+    ctx.beginPath(); ctx.moveTo(-62, 0); ctx.lineTo(10, 0); ctx.stroke();
+    ctx.globalAlpha = pulse; ctx.lineWidth = 3; ctx.strokeStyle = "#ffe6a3";
+    ctx.beginPath(); ctx.moveTo(-22, -12); ctx.quadraticCurveTo(7, -19, 26, 0);
+    ctx.quadraticCurveTo(7, 19, -22, 12); ctx.stroke();
+    ctx.fillStyle = "#fff8dc"; ctx.beginPath(); ctx.moveTo(-11, 0); ctx.lineTo(13, -4);
+    ctx.lineTo(27, 0); ctx.lineTo(13, 4); ctx.closePath(); ctx.fill();
+  } else {
+    ctx.strokeStyle = q.enemy ? (foe.phase ? "#9fe8ff" : "#ff6078") : "#dff8ff";
+    ctx.lineWidth = q.enemy ? 7 : 5; ctx.globalAlpha = Math.max(0, Math.min(1, q.life));
+    ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(30, 0); ctx.stroke();
+  }
+  ctx.restore();
+}
 /* 火花画成一小段拖尾（用自身速度反推尾巴），比圆点更像"被打飞出来的碎屑"。 */
 function drawSpark(s){ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,s.life*4));ctx.strokeStyle=s.col;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x-s.vx*.022,s.y-s.vy*.022);ctx.stroke();ctx.restore()}
 /* 顿帧只暂停 update，继续 draw 和排帧；照常更新 last，避免恢复时累积大 dt。 */
@@ -320,10 +604,15 @@ function frame(now){var dt=last?Math.min(.033,(now-last)/1000):0;last=now;
  if(hitStop>0){hitStop=Math.max(0,hitStop-dt);draw();if(state==="fight")raf=requestAnimationFrame(frame);return}
  update(dt);draw();if(state==="fight")raf=requestAnimationFrame(frame)}
 /* 开场说明数秒后隐藏，避免遮挡战斗区；reload 重试时重新计时。 */
+document.getElementById("bossRank").textContent=BOSS_LEVEL?BossProgress.label(BOSS_LEVEL):"";
+syncBattleHud();
+renderBestRecords();
+if(BOSS_LEVEL>=2)document.getElementById("hint").innerHTML+="<br>金色剑气会反弹，命中前不会消失。";
+if(MAX_STRENGTH)document.getElementById("hint").innerHTML+="<br>满加强：扇斩、闪避各储存两次，每4秒恢复一次。";
 setTimeout(function(){document.getElementById("hint").classList.add("hide")},4600);
 window.addEventListener("message",function(e){if(e.data&&e.data.what==="well-esc")leaveGame()});requestAnimationFrame(frame);requestAnimationFrame(function(){requestAnimationFrame(function(){say("well-hello")})});
 /* 探针 dash 导出动作函数，状态从 dogState.dash 读取，避免同名属性覆盖。 */
-window.__bossProbe={get state(){return state},get hp(){return dog.hp},get bossHp(){return foe.hp},get phase(){return foe.phase},get platforms(){return platforms.map(function(p){return{x:p.x,y:p.y,w:p.w,h:p.h}})},
+window.__bossProbe={get level(){return BOSS_LEVEL},get elapsed(){return battleSeconds()},get ability(){return {action:foe.action&&foe.action.kind,lungeCharges:foe.lungeCharges,evadeCharges:foe.evadeCharges,lungeCd:foe.lungeCd,evadeCd:foe.evadeCd,inv:foe.inv,retreat:foe.retreatT,reach:slashReach()}},get state(){return state},get hp(){return dog.hp},get bossHp(){return foe.hp},get phase(){return foe.phase},get platforms(){return platforms.map(function(p){return{x:p.x,y:p.y,w:p.w,h:p.h}})},
  /* footing.plat 为当前浮台编号，-1 表示不在浮台上；kb/cut/sparks 分别记录击退、刀线和火花。 */
  get footing(){return{y:+dog.y.toFixed(1),ground:dog.ground,plat:dogPlat(),vy:+dog.vy.toFixed(1)}},
  /* attack/dash 为独立计时器，由相应动作设为 .28/.22；冲刺速度 920px/s，攻击不位移。 */
