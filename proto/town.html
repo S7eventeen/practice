@@ -112,7 +112,7 @@
   @media (prefers-reduced-motion:reduce){ #notice.on #noticeBoard{ animation:none } }
 
   #noticeBoard{
-    position:relative; width:min(620px, 100%); max-height:100%;
+    position:relative; width:min(620px, 100%); max-height:100%; overflow-y:auto;
     border:5px solid #8A5A32; box-sizing:border-box;
     padding:20px 26px 24px;
     /* 硬投影延续方块风格，首层 2px 暗线分隔木框与遮罩。 */
@@ -139,6 +139,17 @@
         background:transparent; border:2px solid transparent; padding:0;
         color:#8A5A32; line-height:1 }
   .n-x:hover{ color:#E6BB85; background:#6B3F16 }
+
+  #noticeArcadeFlyer{position:relative;display:block;margin:25px 10px 4px auto;width:min(280px,90%);padding:19px 12px 0;transform:rotate(-3deg);border:1px solid #c8bba0;background:#fff8df;color:#b52b29;box-shadow:3px 5px 0 #67482344;text-align:center}
+  #noticeArcadeFlyer[hidden]{display:none}
+  #noticeArcadeFlyer,#noticeArcadeFlyer *{font-family:"Microsoft YaHei",sans-serif!important}
+  #noticeArcadeFlyer::before,#noticeArcadeFlyer::after{content:"";position:absolute;top:-10px;width:54px;height:22px;background:#f6e7b8b8;transform:rotate(12deg)}
+  #noticeArcadeFlyer::before{left:12px}#noticeArcadeFlyer::after{right:12px;transform:rotate(-14deg)}
+  #noticeArcadeFlyer strong{display:block;font-weight:900!important;font-size:23px;line-height:1.5;font-weight:900}
+  #noticeArcadeFlyer small{display:block;margin:7px 0 12px;font-size:13px;color:#805737}
+  #noticeArcadeFlyer .tear-tabs{display:block;border-top:1px dashed #ba9982;padding:9px 0;background:repeating-linear-gradient(90deg,transparent 0 39px,#ba9982 39px 40px);font-size:12px;letter-spacing:9px}
+  .arcade-flyer,.arcade-trophy{cursor:pointer;pointer-events:all}
+  .arcade-flyer:focus-visible,.arcade-trophy:focus-visible{outline:2px solid #b93630;outline-offset:3px}
 
   .n-list{ list-style:none; margin:16px 0 0; padding:0; counter-reset:n;
            display:flex; flex-direction:column; gap:10px }
@@ -370,6 +381,7 @@
       <li>作者为了凑字数真的很努力了；</li>
       <li>存在隐藏结局</li>
     </ol>
+    <div id="noticeArcadeFlyer" hidden><strong>游戏厅上新啦！！！</strong><small>大狗嚼 · BOSS 挑战赛<br>路过别错过，来挑战一下！</small><span class="tear-tabs" aria-hidden="true">来玩 来玩 来玩</span></div>
   </div>
 </div>
 
@@ -467,6 +479,7 @@
   </div>
 </div></div>
 <script src="boss-progress.js"></script>
+<script src="boss-awards.js"></script>
 <script>
 "use strict";
 var Q = new URLSearchParams(location.search);
@@ -545,6 +558,7 @@ function readBossCleared(){
 function unlockBossReplay(){
   S.bossCleared = true;
   try { localStorage.setItem(BOSS_CLEAR_KEY, "1"); } catch (e) {}
+  syncTownRewards();
 }
 var S = { clicks:{}, unlocked:false, hover:null, t:0,
   doorOpen:false, story:"town", signal:"idle", visited:{},
@@ -808,6 +822,7 @@ function building(b){
   if (K === "tavern")      tavernProps(body, x, y, w, d, JET);
   else if (K === "books")  bookProps(body, x, y, w, d, JET);
   else if (K === "home")   homeProps(body, x, y, w, d);
+  else if (K === "arcade" && BossAwards.earned(S.bossProgress)) arcadeTrophy(body,b);
   return finish(g, body, b, x, y, w, d, R.zr);
 }
 
@@ -876,6 +891,108 @@ function homeProps(g, x, y, w, d){
 
 /* 公告板由两根柱子、板面和平顶组成，触发三次后解锁。
    平顶露出板面，并使其外形区别于房屋。 */
+function arcadeFlyer(body,b){
+  var x=b.x+.43,y=b.y+b.d*.55+.065,z=b.h-.23;
+  var a=P(x,y,z),u=P(x+.63,y,z),v=P(x,y,z-.64);
+  var g=el("g",{class:"arcade-flyer",role:"button",tabindex:"0","aria-label":"游戏厅上新公告，查看公告板",
+    transform:"matrix("+[(u[0]-a[0])/120,(u[1]-a[1])/120,(v[0]-a[0])/145,(v[1]-a[1])/145,a[0],a[1]].join(" ")+")"});
+  g.appendChild(el("path",{d:"M0 0H120V140L110 145 100 140 90 145 80 140 70 145 60 140 50 145 40 140 30 145 20 140 10 145 0 140Z",fill:"#fff7db",stroke:"#ad8c68","stroke-width":2}));
+  g.appendChild(el("path",{d:"M12-5H45V10H12ZM78-5H110V10H78Z",fill:"#eed69a",opacity:".85"}));
+  var t=el("text",{x:60,y:57,"text-anchor":"middle",fill:"#bd302c","font-family":"Microsoft YaHei,sans-serif","font-size":41,"font-weight":900});t.textContent="上新";g.appendChild(t);
+  var sub=el("text",{x:60,y:90,"text-anchor":"middle",fill:"#854e35","font-family":"Microsoft YaHei,sans-serif","font-size":23});sub.textContent="游戏厅";g.appendChild(sub);
+  g.appendChild(el("path",{d:"M8 105H112M24 106V139M48 106V139M72 106V139M96 106V139",stroke:"#c89880","stroke-width":1.5,"stroke-dasharray":"4 3"}));
+  body.appendChild(g);
+}
+function arcadeTrophy(body,b){
+  var x=b.x+b.w-.35,y=b.y+b.d+.36;
+  var g=el("g",{class:"arcade-trophy",role:"button",tabindex:"0","aria-label":"满加强冠军奖杯，查看通关奖状"});
+  var title=el("title",{});title.textContent="满加强征服者 · 点击查看奖状";g.appendChild(title);
+  var mesh=[],N=16;
+  function face(points,fill){
+    var center=points.reduce(function(sum,p){return [sum[0]+p[0],sum[1]+p[1],sum[2]+p[2]]},[0,0,0]);
+    center=center.map(function(v){return v/points.length});
+    mesh.push({points:points.map(function(p){return [x+p[0],y+p[1],p[2]]}),fill:fill,
+      depth:P(x+center[0],y+center[1],0)[1]+center[2]*TH*TH/(2*ZH)});
+  }
+  function box(rx,ry,low,high,colors){
+    face([[-rx,-ry,low],[-rx,ry,low],[-rx,ry,high],[-rx,-ry,high]],colors[0]);
+    face([[rx,ry,low],[rx,-ry,low],[rx,-ry,high],[rx,ry,high]],colors[1]);
+    face([[rx,-ry,low],[-rx,-ry,low],[-rx,-ry,high],[rx,-ry,high]],colors[0]);
+    face([[-rx,ry,low],[rx,ry,low],[rx,ry,high],[-rx,ry,high]],colors[2]);
+    face([[-rx,-ry,high],[rx,-ry,high],[rx,ry,high],[-rx,ry,high]],colors[3]);
+  }
+  function ring(radius,z,i){var a=i*Math.PI*2/N;return [Math.cos(a)*radius,Math.sin(a)*radius,z]}
+  function band(r0,z0,r1,z1,inside){
+    for(var i=0;i<N;i++){
+      var light=Math.cos((i+.5)*Math.PI*2/N+1.1);
+      var color=inside?(light>0?"#aa7428":"#795022"):(light>.55?"#ffe49a":light>-.1?"#efbc4a":light>-.75?"#ce9232":"#a76b25");
+      face([ring(r0,z0,i),ring(r0,z0,i+1),ring(r1,z1,i+1),ring(r1,z1,i)],color);
+    }
+  }
+  var shadow=[];for(var si=0;si<N;si++){var a=si*Math.PI*2/N;shadow.push([x+Math.cos(a)*.37,y+Math.sin(a)*.27,0])}
+  poly(g,shadow,"#352d3955",0);
+  box(.24,.20,0,.23,["#766477","#8d778a","#a68b9a","#d1b9c1"]);
+  box(.15,.13,.24,.31,["#ba7b29","#d09831","#e9b74c","#ffe19a"]);
+  box(.045,.045,.30,.57,["#b67b27","#d99f34","#efbd51","#ffe7a0"]);
+  [-1,1].forEach(function(dir){
+    function hp(i,outer,back){
+      var a=i*Math.PI*2/N;
+      return [dir*(.245+Math.cos(a)*(outer?.17:.105)),back?-.045:.045,.77+Math.sin(a)*(outer?.175:.11)];
+    }
+    for(var i=0;i<N;i++){
+      face([hp(i,true,false),hp(i+1,true,false),hp(i+1,false,false),hp(i,false,false)],"#f3c452");
+      face([hp(i,false,true),hp(i+1,false,true),hp(i+1,true,true),hp(i,true,true)],"#dba33c");
+      face([hp(i,true,true),hp(i+1,true,true),hp(i+1,true,false),hp(i,true,false)],"#ffe09a");
+      face([hp(i,false,false),hp(i+1,false,false),hp(i+1,false,true),hp(i,false,true)],"#ac7527");
+    }
+  });
+  band(.07,.55,.18,.64,false);band(.18,.64,.255,.94,false);
+  band(.12,.71,.215,.94,true);
+  for(var i=0;i<N;i++)face([ring(.255,.94,i),ring(.255,.94,i+1),ring(.215,.94,i+1),ring(.215,.94,i)],"#ffe5a0");
+  var floor=[];for(var i=0;i<N;i++)floor.push(ring(.12,.71,i));face(floor,"#986526");
+  function badge(px,pz){var r=.18+(.255-.18)*(pz-.64)/.30;return [px,Math.sqrt(Math.max(0,r*r-px*px))+.008,pz]}
+  var decals=[];
+  for(var i=0;i<10;i++){
+    var a=-Math.PI/2+i*Math.PI/5,next=a+Math.PI/5,r=i%2?.029:.064,rn=i%2?.064:.029;
+    decals.push([badge(0,.78),badge(Math.cos(a)*r,.78-Math.sin(a)*r),badge(Math.cos(next)*rn,.78-Math.sin(next)*rn)].map(function(p){return [x+p[0],y+p[1],p[2]]}));
+  }
+  mesh.sort(function(a,b){return a.depth-b.depth});
+  mesh.forEach(function(f){poly(g,f.points,f.fill,0)});
+  decals.forEach(function(points){
+    var p=points.map(function(v){return P(v[0],v[1],v[2])});
+    if((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0])>0)poly(g,points,"#ad3834",0);
+  });
+  body.appendChild(g);
+}
+function openArcadeFlyer(){
+  if(!S.bossCleared||S.story!=="town"||SCENE.open)return;
+  openNotice();
+}
+function bindTownRewards(){
+  if(!root)return;
+  root.querySelectorAll(".arcade-flyer,.arcade-trophy").forEach(function(node){
+    if(node.getAttribute("data-bound"))return;node.setAttribute("data-bound","1");
+    function activate(e){
+      if(e.type==="keydown"&&e.key!=="Enter"&&e.key!==" ")return;
+      e.preventDefault();e.stopPropagation();
+      if(S.story!=="town"||SCENE.open)return;
+      if(node.classList.contains("arcade-trophy"))BossAwards.show(S.bossProgress);else openArcadeFlyer();
+    }
+    node.addEventListener("click",activate);node.addEventListener("keydown",activate);
+  });
+}
+function syncTownRewards(){
+  var flyer=document.getElementById("noticeArcadeFlyer");if(flyer)flyer.hidden=!S.bossCleared;
+  if(!root)return;
+  TOWN.forEach(function(b){
+    if(b.k!=="board"&&b.k!=="arcade")return;
+    var body=root.querySelector('.b[data-k="'+b.k+'"] .body');if(!body)return;
+    if(b.k==="board"&&S.bossCleared&&!body.querySelector(".arcade-flyer"))arcadeFlyer(body,b);
+    if(b.k==="arcade"&&BossAwards.earned(S.bossProgress)&&!body.querySelector(".arcade-trophy"))arcadeTrophy(body,b);
+  });
+  bindTownRewards();
+}
+
 function boardKiosk(g, x, y, w, d, h, roof){
   var by = y + d*0.55;
   rectY(g, by, x + 0.06, 0, x + 0.12, h, shade(C.beam,-0.12), 1.2);
@@ -884,6 +1001,7 @@ function boardKiosk(g, x, y, w, d, h, roof){
   // 钉在板上的几张通知。高低交错，一眼看出是"贴满了的板"，不是一块木墙
   for (var i = 0; i < 3; i++)
     rectY(g, by + 0.040, x + 0.10 + i*0.34, 0.60 - (i%2)*0.16, x + 0.36 + i*0.34, h - 0.28, "#E8E2D4", 0.8);
+  if(S.bossCleared)arcadeFlyer(g,{x:x,y:y,w:w,d:d,h:h});
   // 平顶：一整块板 + 一层雪，出檐很小
   var ox = 0.10, oy = 0.12;
   rectX(g, x + w + ox, y - oy, h, y + d + oy, h + 0.10, shade(roof,-0.24), 1.4);
@@ -2649,6 +2767,7 @@ window.addEventListener("message", function(e){
       SCENE.bossRoundWon = true;
       S.bossProgress = BossProgress.victory(S.bossProgress, d.level, d.seconds);
       BossProgress.save(S.bossProgress);
+      if(d.level===4)syncTownRewards();
     }
     return;
   }
@@ -2753,6 +2872,7 @@ window.addEventListener("keydown", function(e){
 
 /* 房屋亮灯表示可进入；累计点击三次后触发镇子变化。 */
 function bind(){
+  syncTownRewards();
   root.querySelectorAll(".mystery-hit").forEach(function(hit){
     var lastTap = 0;
     var tapTimer = 0;

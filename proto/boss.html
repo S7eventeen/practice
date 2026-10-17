@@ -27,6 +27,7 @@ body{display:grid;place-items:center}canvas{display:block;width:100%;height:100%
 #bossModes button:disabled{opacity:.4;cursor:default}
 #bossStock{display:block;margin-top:5px;text-align:right;color:#ffd39d;font-size:10px}
 #bossStock[hidden]{display:none}.actions{flex-wrap:wrap}
+#awardPreview{display:block;width:100%;padding:0;margin:16px 0;border:0;background:transparent;cursor:pointer}#awardPreview[hidden]{display:none}#awardPreview svg{display:block;width:100%;height:auto}
 #clearRecord{color:#ffd39d!important;font-variant-numeric:tabular-nums}
 #hint{position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);max-width:540px;padding:18px 22px;border:1px solid #586273;background:#0b0e15e8;text-align:center;line-height:1.7;transition:opacity .35s;pointer-events:none}
 #hint.hide{opacity:0}#touch{position:fixed;z-index:3;inset:auto 16px 16px;display:none;justify-content:space-between;pointer-events:none}
@@ -36,7 +37,7 @@ body{display:grid;place-items:center}canvas{display:block;width:100%;height:100%
   background:radial-gradient(circle at 50% 42%,#210d18f2 0,#0a050ae8 58%,#05060af7 100%)}
 #result.blue{background:radial-gradient(circle at 50% 42%,#0b2439f2 0,#05090fe8 58%,#04070bf7 100%)}
 #result.on{display:grid}
-#result .box{position:relative;box-sizing:border-box;width:min(86vw,420px);padding:32px 28px 26px;
+#result .box{position:relative;box-sizing:border-box;width:min(86vw,420px);max-height:calc(100dvh - 32px);overflow-y:auto;padding:32px 28px 26px;
   border:1px solid #7a3c56;background:#120a12f0;box-shadow:0 24px 60px #000000b0}
 #result.blue .box{border-color:#3d6f9d;background:#070e17f0}
 #result .box::before{content:"";position:absolute;left:-28px;right:-28px;top:-1px;height:2px;
@@ -63,9 +64,10 @@ button{font:inherit;cursor:pointer}.actions{display:flex;justify-content:center;
 <div id="hud"><div><div class="health" id="hp" role="img" aria-label="生命 5 / 5"><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart0">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart1">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart2">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart3">♥</span></span><span class="heart" aria-hidden="true">♥<span class="heart-fill" id="heart4">♥</span></span></div><time id="battleClock">00:00.00</time><div id="bestRecords" hidden></div><div id="bossModes" hidden><button id="switchThree">挑战加强Ⅲ</button><button id="switchFull">挑战满加强</button></div></div><div id="bossPanel"><div class="boss-heading"><span>BOSS</span><span id="bossRank"></span></div><div id="bossHp" role="progressbar" aria-label="Boss 生命" aria-valuemin="0" aria-valuemax="12" aria-valuenow="12"><div id="bossFill"></div></div><span id="bossValue">12 / 12</span><span id="bossStock" hidden></span></div></div>
 <div id="hint">WASD 移动，W 跳跃（在空中再按一次是二段跳）。鼠标左键发射剑气，右键冲刺闪避。躲开地图炮预警。<br>地形板能站上去，Boss 也会跳上来抢高度。</div>
 <div id="touch"><span><button data-key="KeyA">←</button><button data-key="KeyD">→</button></span><span><button data-key="KeyW">跳</button><button data-action="dash">闪</button><button data-action="attack">剑</button></span></div>
-<div id="result"><div class="box"><h2 id="resultTitle">战斗结束</h2><p id="resultText"></p><p class="stat" id="resultStat"></p><p id="clearRecord" hidden></p><div class="actions"><button id="retry">再试一次</button><button id="fullChallenge" hidden>挑战满加强</button><button id="threeChallenge" hidden>挑战加强Ⅲ</button><button id="next">前进</button></div></div></div>
+<div id="result"><div class="box"><h2 id="resultTitle">战斗结束</h2><p id="resultText"></p><p class="stat" id="resultStat"></p><p id="clearRecord" hidden></p><button id="awardPreview" type="button" aria-label="查看并保存满加强奖状" hidden></button><div class="actions"><button id="retry">再试一次</button><button id="fullChallenge" hidden>挑战满加强</button><button id="threeChallenge" hidden>挑战加强Ⅲ</button><button id="next">前进</button></div></div></div>
 <!-- 狗的画法，生成物，别手改 —— 由 `python scripts/sync-dog.py` 从 town.html 抽出。 -->
 <script src="boss-progress.js"></script>
+<script src="boss-awards.js"></script>
 <script src="dog-flat.js"></script>
 <script>
 "use strict";
@@ -242,12 +244,16 @@ function finish(win){if(state!=="fight")return;battleEnd=performance.now();state
     if(parent===window)BossProgress.save(BOSS_CONTEXT);
     else say("boss-replay-won",{level:BOSS_LEVEL,seconds:seconds,round:ROUND_ID});
   }
+  var award=document.getElementById("awardPreview");
+  award.hidden=!(REPLAY&&win&&MAX_STRENGTH);
+  award.innerHTML=award.hidden?"":BossAwards.svg(BOSS_CONTEXT);
   renderBestRecords();
   document.getElementById("threeChallenge").hidden=!(REPLAY&&BOSS_CONTEXT.fullUnlocked&&BOSS_LEVEL!==3);
   document.getElementById("fullChallenge").hidden=!(REPLAY&&BOSS_CONTEXT.fullUnlocked&&!MAX_STRENGTH);
   if(!REPLAY)say(win?"boss-won":"boss-lost")}
 /* 按钮 id 避免使用 leave，以免覆盖 window.leave。
    失败发送 well-exit 返回小镇，胜利发送 boss-next 进入字幕。 */
+document.getElementById("awardPreview").addEventListener("click",function(){BossAwards.show(BOSS_CONTEXT)});
 function goNext(){ if(REPLAY){leaveGame();return}say(state==="won"?"boss-next":"well-exit") }
 /* Esc 和父页发来的 `well-esc` 都是"退出"，走这一条。 */
 function leaveGame(){
